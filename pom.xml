@@ -25,3 +25,7 @@
     </plugins>
   </build>
 </project>
+<properties>
+  <sonar.organization>los-internacionales</sonar.organization>
+  <sonar.host.url>https://sonarcloud.io</sonar.host.url>
+</properties>
