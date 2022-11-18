@@ -22,3 +22,6 @@ buildNumber.properties
 
 # IntelliJ
 .idea
+
+# SonarGraph
+*.sonargraph/
