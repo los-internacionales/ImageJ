@@ -140,20 +140,8 @@ public class FolderOpener implements PlugIn, TextListener {
 		String[] list = getList(arg, isMacro);
 		if (list == null) return;
 
-		String title = directory;
-		if (title.endsWith(File.separator) || title.endsWith("/"))
-			title = title.substring(0, title.length()-1);
-		int index = title.lastIndexOf(File.separatorChar);
-		if (index!=-1)
-			title = title.substring(index + 1);
-		else {
-			index = title.lastIndexOf("/");
-			if (index!=-1)
-				title = title.substring(index + 1);
-		}
-		if (title.endsWith(":"))
-			title = title.substring(0, title.length()-1);
-		
+		String title = getTitle();
+
 		list = trimFileList(list);
 		String pluginName = "Sequence Reader";
 		if (legacyRegex!=null)
@@ -466,6 +454,23 @@ public class FolderOpener implements PlugIn, TextListener {
    				Recorder.disableCommandRecording();
    			}
 		}
+	}
+
+	private String getTitle() {
+		String title = directory;
+		if (title.endsWith(File.separator) || title.endsWith("/"))
+			title = title.substring(0, title.length()-1);
+		int index = title.lastIndexOf(File.separatorChar);
+		if (index!=-1)
+			title = title.substring(index + 1);
+		else {
+			index = title.lastIndexOf("/");
+			if (index!=-1)
+				title = title.substring(index + 1);
+		}
+		if (title.endsWith(":"))
+			title = title.substring(0, title.length()-1);
+		return title;
 	}
 
 	private String[] getList(String arg, boolean isMacro) {
