@@ -298,10 +298,7 @@ public class ImageInfo implements PlugIn {
 			}
 			s += "Threshold: "+d2s(lower)+"-"+d2s(upper)+uncalibrated+" ("+mode+")\n";
 		}
-		ImageCanvas ic = imp.getCanvas();
-    	double mag = ic!=null?ic.getMagnification():1.0;
-    	if (mag!=1.0) s += "Magnification: " + IJ.d2s(mag,2) + "\n";
-		if (ic!=null) s += "ScaleToFit: " + ic.getScaleToFit() + "\n";
+		s = addCanvas(imp, s);
 
 
 		s = addCalibration(s, cal);
@@ -312,6 +309,14 @@ public class ImageInfo implements PlugIn {
 
 		s = addRoi(imp, s, cal);
 
+		return s;
+	}
+
+	private static String addCanvas(ImagePlus imp, String s) {
+		ImageCanvas ic = imp.getCanvas();
+		double mag = ic!=null?ic.getMagnification():1.0;
+		if (mag!=1.0) s += "Magnification: " + IJ.d2s(mag,2) + "\n";
+		if (ic!=null) s += "ScaleToFit: " + ic.getScaleToFit() + "\n";
 		return s;
 	}
 
