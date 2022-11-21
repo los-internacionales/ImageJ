@@ -343,19 +343,7 @@ public class ImageInfo implements PlugIn {
 	}
 
 	private String addMetadata(ImagePlus imp, String s, Calibration cal, int stackSize) {
-		FileInfo fi = imp.getOriginalFileInfo();
-		if (fi!=null) {
-			if (fi.url!=null && !fi.url.equals(""))
-				s += "URL: " + fi.url + "\n";
-			else {
-				String defaultDir = (fi.directory==null || fi.directory.length()==0)?System.getProperty("user.dir"):"";
-				if (defaultDir.length()>0) {
-					defaultDir = defaultDir.replaceAll("\\\\", "/");
-					defaultDir += "/";
-				}
-				s += "Path: " + defaultDir + fi.getFilePath() + "\n";
-			}
-		}
+		s = addFileInfo(imp, s);
 
 		ImageWindow win = imp.getWindow();
 		if (win!=null) {
@@ -376,6 +364,23 @@ public class ImageInfo implements PlugIn {
 		if (cal.getInvertY()) s += "Inverted y coordinates\n";
 
 		s = addPInfo(imp, s);
+		return s;
+	}
+
+	private static String addFileInfo(ImagePlus imp, String s) {
+		FileInfo fi = imp.getOriginalFileInfo();
+		if (fi!=null) {
+			if (fi.url!=null && !fi.url.equals(""))
+				s += "URL: " + fi.url + "\n";
+			else {
+				String defaultDir = (fi.directory==null || fi.directory.length()==0)?System.getProperty("user.dir"):"";
+				if (defaultDir.length()>0) {
+					defaultDir = defaultDir.replaceAll("\\\\", "/");
+					defaultDir += "/";
+				}
+				s += "Path: " + defaultDir + fi.getFilePath() + "\n";
+			}
+		}
 		return s;
 	}
 
