@@ -333,7 +333,17 @@ public class ImageInfo implements PlugIn {
 	    } else
 	    	s += "Uncalibrated\n";
 
-	    FileInfo fi = imp.getOriginalFileInfo();
+		s = addMetadata(imp, s, cal, stackSize);
+
+		s = addOverlay(imp, s);
+
+		s = addRoi(imp, s, cal);
+
+		return s;
+	}
+
+	private String addMetadata(ImagePlus imp, String s, Calibration cal, int stackSize) {
+		FileInfo fi = imp.getOriginalFileInfo();
 		if (fi!=null) {
 			if (fi.url!=null && !fi.url.equals(""))
 				s += "URL: " + fi.url + "\n";
@@ -358,17 +368,14 @@ public class ImageInfo implements PlugIn {
 			s += "SetMenuBarCount: "+Menus.setMenuBarCount+time+"\n";
 		}
 
-		String zOrigin = stackSize>1||cal.zOrigin!=0.0?","+d2s(cal.zOrigin):"";
+		String zOrigin = stackSize >1|| cal.zOrigin!=0.0?","+d2s(cal.zOrigin):"";
 		String origin = d2s(cal.xOrigin)+","+d2s(cal.yOrigin)+zOrigin;
-		if (!origin.equals("0,0") || cal.getInvertY()) s += "Coordinate origin:  "+origin+"\n";
-	    if (cal.getInvertY()) s += "Inverted y coordinates\n";
+		if (!origin.equals("0,0") || cal.getInvertY()) {
+			s += "Coordinate origin:  " + origin + "\n";
+		}
+		if (cal.getInvertY()) s += "Inverted y coordinates\n";
 
 		s = addPInfo(imp, s);
-
-		s = addOverlay(imp, s);
-
-		s = addRoi(imp, s, cal);
-
 		return s;
 	}
 
