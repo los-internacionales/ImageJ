@@ -134,8 +134,8 @@ public class FolderOpener implements PlugIn, TextListener {
 					legacyRegex = null;
 			}
 		}
-		if (arg==null) {
-			if (!showDialog()) return;
+		if (arg==null && !showDialog()) {
+			return;
 		}
 		if (directory==null || directory.length()==0) {
 			error("No directory specified.     ");
@@ -161,14 +161,14 @@ public class FolderOpener implements PlugIn, TextListener {
 		if (arg==null && !isMacro)
 			Prefs.set(DIR_KEY, directory);
 		//remove subdirectories from list
-		ArrayList fileList = new ArrayList();
-		for (int i=0; i<list.length; i++) {
-			File f = (new File(directory+list[i]));
+		ArrayList<String> fileList = new ArrayList<>();
+		for (String s : list) {
+			File f = (new File(directory + s));
 			if (!f.isDirectory())
-				fileList.add(list[i]);
+				fileList.add(s);
 		}
 		if (fileList.size()<list.length)
-			list = (String[])fileList.toArray(new String[fileList.size()]);
+			list = fileList.toArray(new String[0]);
 
 		String title = directory;
 		if (title.endsWith(File.separator) || title.endsWith("/"))
@@ -196,7 +196,9 @@ public class FolderOpener implements PlugIn, TextListener {
 		if (sortFileNames || IJ.isMacOSX())
 			list = StringSorter.sortNumerically(list);
 		if (IJ.debugMode) IJ.log("FolderOpener: "+directory+" ("+list.length+" files)");
-		int width=0, height=0, stackSize=1;
+		int width=0;
+		int height=0;
+		int stackSize=1;
 		ImageStack stack = null;
 		double min = Double.MAX_VALUE;
 		double max = -Double.MAX_VALUE;
@@ -208,21 +210,21 @@ public class FolderOpener implements PlugIn, TextListener {
 			this.nFiles = list.length;
 		boolean dicomImages = false;
 		try {
-			for (int i=0; i<list.length; i++) {
+			for (String s : list) {
 				Opener opener = new Opener();
 				opener.setSilentMode(true);
 				IJ.redirectErrorMessages(true);
-				ImagePlus imp = opener.openTempImage(directory, list[i]);
+				ImagePlus imp = opener.openTempImage(directory, s);
 				IJ.redirectErrorMessages(false);
-				if (imp!=null) {
+				if (imp != null) {
 					width = imp.getWidth();
 					height = imp.getHeight();
-					if (this.bitDepth==0) {
+					if (this.bitDepth == 0) {
 						this.bitDepth = imp.getBitDepth();
 						this.defaultBitDepth = bitDepth;
 					}
-					String info = (String)imp.getProperty("Info");
-					if (info!=null && info.contains("7FE0,0010"))
+					String info = (String) imp.getProperty("Info");
+					if (info != null && info.contains("7FE0,0010"))
 						dicomImages = true;
 					break;
 				}
@@ -247,7 +249,6 @@ public class FolderOpener implements PlugIn, TextListener {
 			int count = 0;
 			int counter = 0;
 			ImagePlus imp = null;
-			boolean firstMessage = true;
 			boolean fileInfoStack = false;
 			
 			// open images as stack
@@ -341,10 +342,14 @@ public class FolderOpener implements PlugIn, TextListener {
 					}
 				}				
 				if (openAsVirtualStack) { 
-					if (fileInfoStack)
+					if (fileInfoStack) {
+						assert stack instanceof FileInfoVirtualStack;
 						openAsFileInfoStack((FileInfoVirtualStack)stack, directory+list[i]);
-					else
+					}
+					else {
+						assert stack instanceof VirtualStack;
 						((VirtualStack)stack).addSlice(list[i]);
+					}
 				} else {
 					for (int slice=1; slice<=stackSize; slice++) {
 						int bitDepth2 = imp.getBitDepth();
@@ -358,20 +363,19 @@ public class FolderOpener implements PlugIn, TextListener {
 								label2 += ":"+slice;
 						}
 						ip = inputStack.getProcessor(slice);
-						if (bitDepth2!=bitDepth) {
-							if (dicomImages && bitDepth==16 && bitDepth2==32 && this.scale==100) {
-								ip = ip.convertToFloat();
-								bitDepth = 32;
-								ImageStack stack2 = new ImageStack(width, height, stack.getColorModel());
-								for (int n=1; n<=stack.size(); n++) {
-									ImageProcessor ip2 = stack.getProcessor(n);
-									ip2 = ip2.convertToFloat();
-									ip2.subtract(32768);
-									String sliceLabel = stack.getSliceLabel(n);
-									stack2.addSlice(sliceLabel, ip2.convertToFloat());
-								}
-								stack = stack2;
+						if (bitDepth2!=bitDepth && dicomImages && bitDepth==16 && bitDepth2==32 && this.scale==100) {
+							ip = ip.convertToFloat();
+							bitDepth = 32;
+							ImageStack stack2 = new ImageStack(width, height, stack.getColorModel());
+							for (int n=1; n<=stack.size(); n++) {
+								ImageProcessor ip2 = stack.getProcessor(n);
+								ip2 = ip2.convertToFloat();
+								ip2.subtract(32768);
+								String sliceLabel = stack.getSliceLabel(n);
+								stack2.addSlice(sliceLabel, ip2.convertToFloat());
 							}
+							stack = stack2;
+
 						}
 						if (this.scale<100.0)
 							ip = ip.resize((int)(width*this.scale/100.0), (int)(height*this.scale/100.0));
