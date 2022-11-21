@@ -137,19 +137,8 @@ public class FolderOpener implements PlugIn, TextListener {
 			}
 		}
 		if (arg==null && !showDialog()) return;
-		String[] list = getStrings();
+		String[] list = getList(arg, isMacro);
 		if (list == null) return;
-		if (arg==null && !isMacro)
-			Prefs.set(DIR_KEY, directory);
-		//remove subdirectories from list
-		ArrayList<String> fileList = new ArrayList<>();
-		for (String s : list) {
-			File f = (new File(directory + s));
-			if (!f.isDirectory())
-				fileList.add(s);
-		}
-		if (fileList.size()<list.length)
-			list = fileList.toArray(new String[0]);
 
 		String title = directory;
 		if (title.endsWith(File.separator) || title.endsWith("/"))
@@ -166,8 +155,6 @@ public class FolderOpener implements PlugIn, TextListener {
 			title = title.substring(0, title.length()-1);
 		
 		list = trimFileList(list);
-		if (list==null)
-			return;
 		String pluginName = "Sequence Reader";
 		if (legacyRegex!=null)
 			pluginName += "(legacy)";
@@ -479,6 +466,23 @@ public class FolderOpener implements PlugIn, TextListener {
    				Recorder.disableCommandRecording();
    			}
 		}
+	}
+
+	private String[] getList(String arg, boolean isMacro) {
+		String[] list = getStrings();
+		if (list == null) return null;
+		if (arg ==null && !isMacro)
+			Prefs.set(DIR_KEY, directory);
+		//remove subdirectories from list
+		ArrayList<String> fileList = new ArrayList<>();
+		for (String s : list) {
+			File f = (new File(directory + s));
+			if (!f.isDirectory())
+				fileList.add(s);
+		}
+		if (fileList.size()<list.length)
+			list = fileList.toArray(new String[0]);
+		return list;
 	}
 
 	private String[] getStrings() {
