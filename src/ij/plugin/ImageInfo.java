@@ -227,58 +227,11 @@ public class ImageInfo implements PlugIn {
     	if (lutName!=null) s += "LUT name: "+lutName+"\n";
 		double interval = cal.frameInterval;
 		double fps = cal.fps;
-    	if (stackSize>1) {
-    		ImageStack stack = imp.getStack();
-    		int slice = imp.getCurrentSlice();
-    		String number = slice + "/" + stackSize;
-    		String label = stack.getSliceLabel(slice);
-    		if (label!=null && label.contains("\n"))
-    			label = stack.getShortSliceLabel(slice);
-    		if (label!=null && label.length()>0)
-    			label = " (" + label + ")";
-    		else
-    			label = "";
-			if (imp.getNFrames()>1 || interval>0.0 || fps!=0.0) {
-				s += "Frame: " + number + label + "\n";
-				if (fps!=0.0) {
-					String sRate = Math.abs(fps-Math.round(fps))<0.00001?IJ.d2s(fps,0):IJ.d2s(fps,5);
-					s += "Frame rate: " + sRate + " fps\n";
-				} else
-					s += "Frame interval: " + ((int)interval==interval?IJ.d2s(interval,0):IJ.d2s(interval,5)) + " " + cal.getTimeUnit() + "\n";
-			} else
-				s += "Image: " + number + label + "\n";
-			if (imp.isHyperStack()) {
-				if (channels>1)
-					s += "  Channel: " + imp.getChannel() + "/" + channels + "\n";
-				if (slices>1)
-					s += "  Slice: " + imp.getSlice() + "/" + slices + "\n";
-				if (frames>1)
-					s += "  Frame: " + imp.getFrame() + "/" + frames + "\n";
-			}
-			if (imp.isComposite()) {
-				if (!imp.isHyperStack() && channels>1)
-					s += "  Channels: " + channels + "\n";
-				String mode = ((CompositeImage)imp).getModeAsString();
-				s += "  Composite mode: \"" + mode + "\"\n";
-			}
-			if (stack.isVirtual()) {
-				String stackType = "virtual";
-				if (stack instanceof AVI_Reader)
-					stackType += " (AVI Reader)";
-				if (stack instanceof FileInfoVirtualStack)
-					stackType += " (FileInfoVirtualStack)";
-				if (stack instanceof ListVirtualStack)
-					stackType += " (ListVirtualStack)";
-				s += "Stack type: " + stackType+ "\n";
-			}
-		} else if (imp.hasImageStack()) { // one image stack
-    		String label = imp.getStack().getShortSliceLabel(1);
-    		if (label!=null && label.length()>0) s += "Image: 1/1 (" + label + ")\n";
-		}
+		s = addStackData(imp, s, cal, stackSize, channels, slices, frames, interval, fps);
 
 		s = addLockingMetadata(imp, ip, s, cal);
-		s = addCanvas(imp, s);
 
+		s = addCanvas(imp, s);
 
 		s = addCalibration(s, cal);
 
@@ -288,6 +241,78 @@ public class ImageInfo implements PlugIn {
 
 		s = addRoi(imp, s, cal);
 
+		return s;
+	}
+
+	private static String addStackData(ImagePlus imp, String s, Calibration cal, int stackSize, int channels, int slices, int frames, double interval, double fps) {
+		if (stackSize >1) {
+			ImageStack stack = imp.getStack();
+			int slice = imp.getCurrentSlice();
+			String number = slice + "/" + stackSize;
+			String label = stack.getSliceLabel(slice);
+			if (label!=null && label.contains("\n"))
+				label = stack.getShortSliceLabel(slice);
+			if (label!=null && label.length()>0)
+				label = " (" + label + ")";
+			else
+				label = "";
+			s = getFPSData(imp, s, cal, interval, fps, number, label);
+			s = getHyperStackData(imp, s, channels, slices, frames);
+			s = getCompositeData(imp, s, channels);
+			s = getVirtualData(s, stack);
+		} else if (imp.hasImageStack()) { // one image stack
+			String label = imp.getStack().getShortSliceLabel(1);
+			if (label!=null && label.length()>0) s += "Image: 1/1 (" + label + ")\n";
+		}
+		return s;
+	}
+
+	private static String getVirtualData(String s, ImageStack stack) {
+		if (stack.isVirtual()) {
+			String stackType = "virtual";
+			if (stack instanceof AVI_Reader)
+				stackType += " (AVI Reader)";
+			if (stack instanceof FileInfoVirtualStack)
+				stackType += " (FileInfoVirtualStack)";
+			if (stack instanceof ListVirtualStack)
+				stackType += " (ListVirtualStack)";
+			s += "Stack type: " + stackType+ "\n";
+		}
+		return s;
+	}
+
+	private static String getCompositeData(ImagePlus imp, String s, int channels) {
+		if (imp.isComposite()) {
+			if (!imp.isHyperStack() && channels >1)
+				s += "  Channels: " + channels + "\n";
+			String mode = ((CompositeImage) imp).getModeAsString();
+			s += "  Composite mode: \"" + mode + "\"\n";
+		}
+		return s;
+	}
+
+	private static String getHyperStackData(ImagePlus imp, String s, int channels, int slices, int frames) {
+		if (imp.isHyperStack()) {
+			if (channels >1)
+				s += "  Channel: " + imp.getChannel() + "/" + channels + "\n";
+			if (slices >1)
+				s += "  Slice: " + imp.getSlice() + "/" + slices + "\n";
+			if (frames >1)
+				s += "  Frame: " + imp.getFrame() + "/" + frames + "\n";
+		}
+		return s;
+	}
+
+	private static String getFPSData(ImagePlus imp, String s, Calibration cal, double interval, double fps, String number, String label) {
+		if (imp.getNFrames()>1 || interval >0.0 || fps !=0.0) {
+			s += "Frame: " + number + label + "\n";
+			if (fps !=0.0) {
+				String sRate = Math.abs(fps -Math.round(fps))<0.00001?IJ.d2s(fps,0):IJ.d2s(fps,5);
+				s += "Frame rate: " + sRate + " fps\n";
+			} else
+				s += "Frame interval: " + ((int) interval == interval ?IJ.d2s(interval,0):IJ.d2s(interval,5)) + " " + cal.getTimeUnit() + "\n";
+		} else
+			s += "Image: " + number + label + "\n";
 		return s;
 	}
 
