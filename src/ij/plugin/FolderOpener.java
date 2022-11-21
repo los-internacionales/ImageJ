@@ -48,8 +48,10 @@ public class FolderOpener implements PlugIn, TextListener {
 	private TextField startField;
 	private TextField countField;
 	private TextField stepField;
+	private boolean dicomImages;
+	private boolean fileInfoStack;
 
-	
+
 	/** Opens the images in the specified directory as a stack. Displays
 		directory chooser and options dialogs if the argument is null. */
 	public static ImagePlus open(String path) {
@@ -147,10 +149,8 @@ public class FolderOpener implements PlugIn, TextListener {
 		if (legacyRegex!=null)
 			pluginName += "(legacy)";
 		list = getFilteredList(list, filter, pluginName);
-		if (list==null)
-			return;
-		if (sortFileNames || IJ.isMacOSX())
-			list = StringSorter.sortNumerically(list);
+		if (list==null) return;
+		if (sortFileNames || IJ.isMacOSX()) list = StringSorter.sortNumerically(list);
 		if (IJ.debugMode) IJ.log("FolderOpener: "+directory+" ("+list.length+" files)");
 		int width=0;
 		int height=0;
@@ -164,8 +164,8 @@ public class FolderOpener implements PlugIn, TextListener {
 		Overlay overlay = null;
 		if (this.nFiles==0)
 			this.nFiles = list.length;
-		boolean dicomImages = false;
 		try {
+			dicomImages = false;
 			for (String s : list) {
 				Opener opener = new Opener();
 				opener.setSilentMode(true);
@@ -193,19 +193,11 @@ public class FolderOpener implements PlugIn, TextListener {
 			}
 			IJ.showStatus("");
 			t0 = System.currentTimeMillis();
-			if (dicomImages && !IJ.isMacOSX() && !sortFileNames)
-				list = StringSorter.sortNumerically(list);
-
-			if (this.nFiles<1)
-				this.nFiles = list.length;
-			if (this.start<1 || this.start>list.length)
-				this.start = 1;
-			if (this.start+this.nFiles-1>list.length)
-				this.nFiles = list.length-this.start+1;
+			list = refineList(list);
 			int count = 0;
 			int counter = 0;
 			ImagePlus imp = null;
-			boolean fileInfoStack = false;
+			fileInfoStack = false;
 			
 			// open images as stack
 			for (int i=this.start-1; i<list.length; i++) {
@@ -237,22 +229,7 @@ public class FolderOpener implements PlugIn, TextListener {
 					max = ip.getMax();
 					cal = imp.getCalibration();
 					ColorModel cm = imp.getProcessor().getColorModel();
-					if (openAsVirtualStack) {
-						if (stackSize>1) {
-							stack = new FileInfoVirtualStack();
-							fileInfoStack = true;
-						} else {
-							if (stackWidth>0 && stackHeight>0)
-								stack = new VirtualStack(stackWidth, stackHeight, cm, directory);
-							else
-								stack = new VirtualStack(width, height, cm, directory);
-						}
-					}  else if (this.scale<100.0)						
-						stack = new ImageStack((int)(width*this.scale/100.0), (int)(height*this.scale/100.0), cm);
-					else
-						stack = new ImageStack(width, height, cm);
-					if (bitDepth!=0)
-						stack.setBitDepth(bitDepth);
+					stack = getImageStack(width, height, stackSize, null, cm);
 					info1 = (String)imp.getProperty("Info");
 				}
 				if (imp==null)
@@ -454,6 +431,38 @@ public class FolderOpener implements PlugIn, TextListener {
    				Recorder.disableCommandRecording();
    			}
 		}
+	}
+
+	private ImageStack getImageStack(int width, int height, int stackSize, ImageStack stack, ColorModel cm) {
+		if (openAsVirtualStack) {
+			if (stackSize >1) {
+				stack = new FileInfoVirtualStack();
+				fileInfoStack = true;
+			} else {
+				if (stackWidth>0 && stackHeight>0)
+					stack = new VirtualStack(stackWidth, stackHeight, cm, directory);
+				else
+					stack = new VirtualStack(width, height, cm, directory);
+			}
+		}  else if (this.scale<100.0)
+			stack = new ImageStack((int)(width *this.scale/100.0), (int)(height *this.scale/100.0), cm);
+		else
+			stack = new ImageStack(width, height, cm);
+		if (bitDepth!=0)
+			stack.setBitDepth(bitDepth);
+		return stack;
+	}
+
+	private String[] refineList(String[] list) {
+		if (dicomImages && !IJ.isMacOSX() && !sortFileNames) list = StringSorter.sortNumerically(list);
+
+		if (this.nFiles<1)
+			this.nFiles = list.length;
+		if (this.start<1 || this.start> list.length)
+			this.start = 1;
+		if (this.start+this.nFiles-1> list.length)
+			this.nFiles = list.length-this.start+1;
+		return list;
 	}
 
 	private String getTitle() {
