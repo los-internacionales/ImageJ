@@ -368,8 +368,16 @@ public class ImageInfo implements PlugIn {
 	   		s += "Properties: " + pinfo + "\n";
 	   	else
 	   		s += "No properties\n";
-	   	
-	    Overlay overlay = imp.getOverlay();
+
+		s = addOverlay(imp, s);
+
+		s = addRoi(imp, s, cal);
+
+		return s;
+	}
+
+	private static String addOverlay(ImagePlus imp, String s) {
+		Overlay overlay = imp.getOverlay();
 		if (overlay!=null) {
 			int n = overlay.size();
 			String elements = n==1?" element":" elements";
@@ -382,9 +390,6 @@ public class ImageInfo implements PlugIn {
 		Interpreter interp = Interpreter.getInstance();
 		if (interp!=null)
 			s += "Macro is running"+(Interpreter.isBatchMode()?" in batch mode":"")+"\n";
-
-		s = addRoi(imp, s, cal);
-
 		return s;
 	}
 
