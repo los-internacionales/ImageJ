@@ -134,32 +134,8 @@ public class ImageInfo implements PlugIn {
 		String yunit = cal.getYUnit();
 		String zunit = cal.getZUnit();
 		if (cal.scaled()) {
-			String xunits = cal.getUnits();
-			String yunits = xunits;
-			String zunits = xunits;
-			if (nonUniformUnits) {
-				xunits = xunit;
-				yunits = yunit;
-				zunits = zunit;
-			}
-			double pw = imp.getWidth()*cal.pixelWidth;
-			double ph = imp.getHeight()*cal.pixelHeight;
-	    	s += "Width:  "+d2s(pw)+" " + xunits+" ("+imp.getWidth()+")\n";
-	    	s += "Height:  "+d2s(ph)+" " + yunits+" ("+imp.getHeight()+")\n";
-	    	if (slices>1) {
-				double pd = slices*cal.pixelDepth;
-	    		s += "Depth:  "+d2s(pd)+" " + zunits+" ("+slices+")\n";
-	    	}
-			s += "Size:  "+ImageWindow.getImageSize(imp)+"\n";
-	    	double xResolution = 1.0/cal.pixelWidth;
-	    	double yResolution = 1.0/cal.pixelHeight;
-	    	if (xResolution==yResolution)
-	    		s += "Resolution:  "+d2s(xResolution) + " pixels per "+xunit+"\n";
-	    	else {
-	    		s += "X Resolution:  "+d2s(xResolution) + " pixels per "+xunit+"\n";
-	    		s += "Y Resolution:  "+d2s(yResolution) + " pixels per "+yunit+"\n";
-	    	}
-	    } else {
+			s = addScaledData(imp, s, cal, slices, nonUniformUnits, xunit, yunit, zunit);
+		} else {
 	    	s += "Width:  " + imp.getWidth() + " pixels\n";
 	    	s += "Height:  " + imp.getHeight() + " pixels\n";
 	    	if (stackSize>1)
@@ -197,6 +173,35 @@ public class ImageInfo implements PlugIn {
 
 		s = addRoi(imp, s, cal);
 
+		return s;
+	}
+
+	private String addScaledData(ImagePlus imp, String s, Calibration cal, int slices, boolean nonUniformUnits, String xunit, String yunit, String zunit) {
+		String xunits = cal.getUnits();
+		String yunits = xunits;
+		String zunits = xunits;
+		if (nonUniformUnits) {
+			xunits = xunit;
+			yunits = yunit;
+			zunits = zunit;
+		}
+		double pw = imp.getWidth()* cal.pixelWidth;
+		double ph = imp.getHeight()* cal.pixelHeight;
+		s += "Width:  "+d2s(pw)+" " + xunits+" ("+ imp.getWidth()+")\n";
+		s += "Height:  "+d2s(ph)+" " + yunits+" ("+ imp.getHeight()+")\n";
+		if (slices >1) {
+			double pd = slices * cal.pixelDepth;
+			s += "Depth:  "+d2s(pd)+" " + zunits+" ("+ slices +")\n";
+		}
+		s += "Size:  "+ImageWindow.getImageSize(imp)+"\n";
+		double xResolution = 1.0/ cal.pixelWidth;
+		double yResolution = 1.0/ cal.pixelHeight;
+		if (xResolution==yResolution)
+			s += "Resolution:  "+d2s(xResolution) + " pixels per "+ xunit +"\n";
+		else {
+			s += "X Resolution:  "+d2s(xResolution) + " pixels per "+ xunit +"\n";
+			s += "Y Resolution:  "+d2s(yResolution) + " pixels per "+ yunit +"\n";
+		}
 		return s;
 	}
 
