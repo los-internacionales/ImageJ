@@ -2508,6 +2508,11 @@ public class Plot implements Cloneable {
 		FontMetrics fm = ip.getFontMetrics();
 		int fontAscent = fm.getAscent();
 		ip.setJustification(LEFT);
+		int yOfXAxisNumbers = getyOfXAxisNumbers(steps, xCats, multiplySymbol, scFont, scFontMedium, scFontSmall, fm, fontAscent);
+		plotYAxis(steps, xCats, yCats, multiplySymbol, scFont, scFontMedium, scFontSmall, fm, fontAscent, yOfXAxisNumbers);
+	}
+
+	private int getyOfXAxisNumbers(double[] steps, String[] xCats, String multiplySymbol, Font scFont, Font scFontMedium, Font scFontSmall, FontMetrics fm, int fontAscent) {
 		// ---	A l o n g	X	A x i s
 		int yOfXAxisNumbers = topMargin + frameHeight + fm.getHeight()*5/4 + sc(2);
 		if (hasFlag(X_NUMBERS | (logXAxis ? (X_TICKS | X_MINOR_TICKS) : X_LOG_TICKS) + X_GRID)) {
@@ -2529,58 +2534,71 @@ public class Plot implements Cloneable {
 					ip.drawString(s, xBasePxl-ip.getStringWidth(s)/2, yOfXAxisNumbers);
 				}
 			} else {
-				if (hasFlag(X_NUMBERS)) {
-					int w1 = ip.getStringWidth(IJ.d2s(currentMinMax[0], logXAxis ? -1 : digits));
-					int w2 = ip.getStringWidth(IJ.d2s(currentMinMax[1], logXAxis ? -1 : digits));
-					int wMax = Math.max(w1,w2);
-					if (wMax > Math.abs(step*xScale)-sc(8)) {
-						baseFont = scFontMedium;   //small font if there is not enough space for the numbers
-						ip.setFont(baseFont);
-					}
-				}
-
-				for (int i=0; i<=(i2-i1); i++) {
-					double v = (i+i1)*step;
-					int x = (int)Math.round((v - xMin)*xScale) + leftMargin;
-
-					if (xCats!= null) {
-						int index = (int) v;
-						double remainder =  Math.abs(v - Math.round(v));
-						if(index >= 0 && index < xCats.length  && remainder < 1e-9){
-							String s = xCats[index];
-							String[] parts = s.split("\n");
-							int w = 0;
-							for(int jj = 0; jj < parts.length; jj++)
-								w = Math.max(w, ip.getStringWidth(parts[jj]));
-
-							ip.drawString(s, x-w/2, yOfXAxisNumbers);
-						}
-						continue;
-					}
-
-					if (hasFlag(X_GRID)) {
-						ip.setColor(gridColor);
-						ip.drawLine(x, y1, x, y2);
-						ip.setColor(Color.black);
-					}
-					if (majorTicks) {
-						ip.drawLine(x, y1, x, y1+sc(tickLength));
-						ip.drawLine(x, y2, x, y2-sc(tickLength));
-					}
-					if (hasFlag(X_NUMBERS)) {
-						if (logXAxis || digits<0) {
-							drawExpString(logXAxis ? Math.pow(10,v) : v, logXAxis ? -1 : -digits,
-									x, yOfXAxisNumbers-fontAscent/2, CENTER, fontAscent, baseFont, scFontSmall, multiplySymbol);
-						} else {
-							String s = IJ.d2s(v,digits);
-							ip.drawString(s, x-ip.getStringWidth(s)/2, yOfXAxisNumbers);
-						}
-					}
-				}
-				extractMinorNumbers(multiplySymbol, scFontSmall, fm, fontAscent, yOfXAxisNumbers, baseFont, majorTicks, minorTicks, step, i1, i2, y1, y2);
+				extractHasFlag(xCats, multiplySymbol, scFontMedium, scFontSmall, fm, fontAscent, yOfXAxisNumbers, baseFont, majorTicks, minorTicks, step, i1, i2, digits, y1, y2);
 			}
 		}
-		plotYAxis(steps, xCats, yCats, multiplySymbol, scFont, scFontMedium, scFontSmall, fm, fontAscent, yOfXAxisNumbers);
+		return yOfXAxisNumbers;
+	}
+
+	private void extractHasFlag(String[] xCats, String multiplySymbol, Font scFontMedium, Font scFontSmall, FontMetrics fm, int fontAscent, int yOfXAxisNumbers, Font baseFont, boolean majorTicks, boolean minorTicks, double step, int i1, int i2, int digits, int y1, int y2) {
+		baseFont = getFont(scFontMedium, baseFont, step, digits);
+
+		for (int i = 0; i<=(i2 - i1); i++) {
+			double v = (i+ i1)* step;
+			int x = (int)Math.round((v - xMin)*xScale) + leftMargin;
+
+			if (xCats != null) {
+				int index = (int) v;
+				double remainder =  Math.abs(v - Math.round(v));
+				if(index >= 0 && index < xCats.length  && remainder < 1e-9){
+					String s = xCats[index];
+					String[] parts = s.split("\n");
+					int w = 0;
+					for(int jj = 0; jj < parts.length; jj++)
+						w = Math.max(w, ip.getStringWidth(parts[jj]));
+
+					ip.drawString(s, x-w/2, yOfXAxisNumbers);
+				}
+				continue;
+			}
+
+			hasFlagX(multiplySymbol, scFontSmall, fontAscent, yOfXAxisNumbers, baseFont, majorTicks, digits, y1, y2, v, x);
+		}
+		extractMinorNumbers(multiplySymbol, scFontSmall, fm, fontAscent, yOfXAxisNumbers, baseFont, majorTicks, minorTicks, step, i1, i2, y1, y2);
+	}
+
+	private Font getFont(Font scFontMedium, Font baseFont, double step, int digits) {
+		if (hasFlag(X_NUMBERS)) {
+			int w1 = ip.getStringWidth(IJ.d2s(currentMinMax[0], logXAxis ? -1 : digits));
+			int w2 = ip.getStringWidth(IJ.d2s(currentMinMax[1], logXAxis ? -1 : digits));
+			int wMax = Math.max(w1,w2);
+			if (wMax > Math.abs(step *xScale)-sc(8)) {
+				baseFont = scFontMedium;   //small font if there is not enough space for the numbers
+				ip.setFont(baseFont);
+			}
+		}
+		return baseFont;
+	}
+
+	private void hasFlagX(String multiplySymbol, Font scFontSmall, int fontAscent, int yOfXAxisNumbers, Font baseFont, boolean majorTicks, int digits, int y1, int y2, double v, int x) {
+		if (hasFlag(X_GRID)) {
+			ip.setColor(gridColor);
+			ip.drawLine(x, y1, x, y2);
+			ip.setColor(Color.black);
+		}
+		if (majorTicks) {
+			ip.drawLine(x, y1, x, y1 +sc(tickLength));
+			ip.drawLine(x, y2, x, y2 -sc(tickLength));
+		}
+		if (hasFlag(X_NUMBERS)) {
+			if (logXAxis || digits <0) {
+				drawExpString(logXAxis ? Math.pow(10, v) : v, logXAxis ? -1 : -digits,
+						x, yOfXAxisNumbers - fontAscent /2, CENTER, fontAscent, baseFont, scFontSmall, multiplySymbol);
+			} else {
+				String s = IJ.d2s(v, digits);
+				ip.drawString(s, x -ip.getStringWidth(s)/2, yOfXAxisNumbers);
+			}
+		}
 	}
 
 	private void extractMinorNumbers(String multiplySymbol, Font scFontSmall, FontMetrics fm, int fontAscent, int yOfXAxisNumbers, Font baseFont, boolean majorTicks, boolean minorTicks, double step, int i1, int i2, int y1, int y2) {
