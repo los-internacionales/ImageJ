@@ -276,28 +276,7 @@ public class ImageInfo implements PlugIn {
     		if (label!=null && label.length()>0) s += "Image: 1/1 (" + label + ")\n";
 		}
 
-		if (imp.isLocked())
-			s += "**Locked**\n";
-		if (ip.getMinThreshold()==ImageProcessor.NO_THRESHOLD)
-			s += "No threshold\n";
-	    else {
-	    	double lower = ip.getMinThreshold();
-	    	double upper = ip.getMaxThreshold();
-	    	String uncalibrated = "";
-			if (cal.calibrated()) {
-				uncalibrated = " ("+(int)lower+"-"+(int)upper+")";
-				lower = cal.getCValue((int)lower);
-				upper = cal.getCValue((int)upper);
-			}
-			int lutMode = ip.getLutUpdateMode();
-			String mode = "red";
-			switch (lutMode) {
-				case ImageProcessor.BLACK_AND_WHITE_LUT: mode="B&W"; break;
-				case ImageProcessor.NO_LUT_UPDATE: mode="invisible"; break;
-				case ImageProcessor.OVER_UNDER_LUT: mode="over/under"; break;
-			}
-			s += "Threshold: "+d2s(lower)+"-"+d2s(upper)+uncalibrated+" ("+mode+")\n";
-		}
+		s = addLockingMetadata(imp, ip, s, cal);
 		s = addCanvas(imp, s);
 
 
@@ -309,6 +288,39 @@ public class ImageInfo implements PlugIn {
 
 		s = addRoi(imp, s, cal);
 
+		return s;
+	}
+
+	private String addLockingMetadata(ImagePlus imp, ImageProcessor ip, String s, Calibration cal) {
+		if (imp.isLocked()) {
+			s += "**Locked**\n";
+		}
+		if (ip.getMinThreshold()==ImageProcessor.NO_THRESHOLD) {
+			s += "No threshold\n";
+		}
+	    else {
+			s = addUncalibratedData(ip, s, cal);
+		}
+		return s;
+	}
+
+	private String addUncalibratedData(ImageProcessor ip, String s, Calibration cal) {
+		double lower = ip.getMinThreshold();
+		double upper = ip.getMaxThreshold();
+		String uncalibrated = "";
+		if (cal.calibrated()) {
+			uncalibrated = " ("+(int)lower+"-"+(int)upper+")";
+			lower = cal.getCValue((int)lower);
+			upper = cal.getCValue((int)upper);
+		}
+		int lutMode = ip.getLutUpdateMode();
+		String mode = "red";
+		switch (lutMode) {
+			case ImageProcessor.BLACK_AND_WHITE_LUT: mode="B&W"; break;
+			case ImageProcessor.NO_LUT_UPDATE: mode="invisible"; break;
+			case ImageProcessor.OVER_UNDER_LUT: mode="over/under"; break;
+		}
+		s += "Threshold: "+d2s(lower)+"-"+d2s(upper)+uncalibrated+" ("+mode+")\n";
 		return s;
 	}
 
