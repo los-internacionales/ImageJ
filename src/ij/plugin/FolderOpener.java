@@ -18,10 +18,9 @@ public class FolderOpener implements PlugIn, TextListener {
 	private static final int MAX_SEPARATE = 100;
 	private static final String DIR_KEY = "import.sequence.dir";
 	private static final String[] types = {"default", "16-bit", "32-bit", "RGB"};
-	private static String[] excludedTypes = {".txt",".lut",".roi",".pty",".hdr",".java",".ijm",".py",".js",".bsh",".xml",".rar",".h5",".doc",".xls"};
+	private static final String[] excludedTypes = {".txt",".lut",".roi",".pty",".hdr",".java",".ijm",".py",".js",".bsh",".xml",".rar",".h5",".doc",".xls"};
 	private static boolean staticSortFileNames = true;
 	private static boolean staticOpenAsVirtualStack;
-	private boolean convertToGrayscale;  //unused
 	private boolean sortFileNames = true;
 	private boolean sortByMetaData = true;
 	private boolean openAsVirtualStack;
@@ -34,7 +33,8 @@ public class FolderOpener implements PlugIn, TextListener {
 	private ImagePlus image;
 	private boolean saveImage;
 	private long t0;
-	private int stackWidth, stackHeight;
+	private int stackWidth;
+	private int stackHeight;
 	private int bitDepth;
 	private int defaultBitDepth;
 	private int nFiles = 0;
@@ -43,7 +43,11 @@ public class FolderOpener implements PlugIn, TextListener {
 	private double scale = 100.0;
 	private boolean openAsSeparateImages;
 	private boolean runningOpen;	
-	private TextField dirField, filterField, startField, countField, stepField;
+	private TextField dirField;
+	private TextField filterField;
+	private TextField startField;
+	private TextField countField;
+	private TextField stepField;
 
 	
 	/** Opens the images in the specified directory as a stack. Displays
@@ -129,35 +133,12 @@ public class FolderOpener implements PlugIn, TextListener {
 			arg = null;
 			String macroOptions = Macro.getOptions();
 			if (macroOptions!=null) {
-				legacyRegex = Macro.getValue(macroOptions, "or", "");
-				if (legacyRegex.equals(""))
-					legacyRegex = null;
+				legacyRegex = Macro.getValue(macroOptions, "or", null);
 			}
 		}
-		if (arg==null && !showDialog()) {
-			return;
-		}
-		if (directory==null || directory.length()==0) {
-			error("No directory specified.     ");
-			return;
-		}
-		File file = new File(directory);
-		String[] list = file.list();
-		if (list==null) {
-			String parent = file.getParent();
-			if (parent!=null) {
-				file = new File(parent);
-				list = file.list();
-			}
-			if (list!=null)
-				directory = parent;
-			else {
-				error("Directory not found: "+directory);
-				return;
-			}
-		}
-		if (!(directory.endsWith("/")||directory.endsWith("\\")))
-			directory += "/";
+		if (arg==null && !showDialog()) return;
+		String[] list = getStrings();
+		if (list == null) return;
 		if (arg==null && !isMacro)
 			Prefs.set(DIR_KEY, directory);
 		//remove subdirectories from list
@@ -499,7 +480,31 @@ public class FolderOpener implements PlugIn, TextListener {
    			}
 		}
 	}
-	
+
+	private String[] getStrings() {
+		if (directory==null || directory.length()==0) {
+			error("No directory specified.     ");
+			return null;
+		}
+		File file = new File(directory);
+		String[] list = file.list();
+		if (list==null) {
+			String parent = file.getParent();
+			if (parent!=null) {
+				file = new File(parent);
+				list = file.list();
+			}
+			if (list==null) {
+				error("Directory not found: "+directory);
+				return null;
+			}
+			directory = parent;
+		}
+		if (!(directory.endsWith("/")||directory.endsWith("\\")))
+			directory += "/";
+		return list;
+	}
+
 	private void error(String msg) {
 		IJ.error("Import>Image Sequence", msg);
 	}
