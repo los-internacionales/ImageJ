@@ -5,12 +5,10 @@ import ij.process.*;
 import ij.measure.*;
 import ij.io.*;
 import ij.util.Tools;
-import ij.plugin.frame.Editor;
 import ij.plugin.filter.Analyzer;
 import ij.text.TextWindow;
 import ij.macro.Interpreter;
 import java.awt.*;
-import java.util.*;
 import java.lang.reflect.*;
 import java.awt.geom.Rectangle2D;
 
@@ -123,17 +121,14 @@ public class ImageInfo implements PlugIn {
 	}
 
 	private String getInfo(ImagePlus imp, ImageProcessor ip) {
-		String s = new String("");
-		if (IJ.getInstance()!=null)
-			s += IJ.getInstance().getInfo()+"\n \n";
+		String s = "";
+		if (IJ.getInstance()!=null) s += IJ.getInstance().getInfo()+"\n \n";
 		s += "Title: " + imp.getTitle() + "\n";
 		Calibration cal = imp.getCalibration();
     	int stackSize = imp.getStackSize();
     	int channels = imp.getNChannels();
     	int slices = imp.getNSlices();
     	int frames = imp.getNFrames();
-		int digits = imp.getBitDepth()==32?4:0;
-		int dp, dp2;
 		boolean nonUniformUnits = !cal.getXUnit().equals(cal.getYUnit());
 		String xunit = cal.getXUnit();
 		String yunit = cal.getYUnit();
@@ -229,8 +224,7 @@ public class ImageInfo implements PlugIn {
 	    		break;
     	}
     	String lutName = imp.getProp(LUT.nameKey);
-    	if (lutName!=null)
-			s += "LUT name: "+lutName+"\n";    		
+    	if (lutName!=null) s += "LUT name: "+lutName+"\n";
 		double interval = cal.frameInterval;
 		double fps = cal.fps;
     	if (stackSize>1) {
@@ -279,8 +273,7 @@ public class ImageInfo implements PlugIn {
 			}
 		} else if (imp.hasImageStack()) { // one image stack
     		String label = imp.getStack().getShortSliceLabel(1);
-    		if (label!=null && label.length()>0)
-				s += "Image: 1/1 (" + label + ")\n";
+    		if (label!=null && label.length()>0) s += "Image: 1/1 (" + label + ")\n";
 		}
 
 		if (imp.isLocked())
@@ -307,10 +300,8 @@ public class ImageInfo implements PlugIn {
 		}
 		ImageCanvas ic = imp.getCanvas();
     	double mag = ic!=null?ic.getMagnification():1.0;
-    	if (mag!=1.0)
-			s += "Magnification: " + IJ.d2s(mag,2) + "\n";
-		if (ic!=null)
-			s += "ScaleToFit: " + ic.getScaleToFit() + "\n";
+    	if (mag!=1.0) s += "Magnification: " + IJ.d2s(mag,2) + "\n";
+		if (ic!=null) s += "ScaleToFit: " + ic.getScaleToFit() + "\n";
 
 
 	    String valueUnit = cal.getValueUnit();
@@ -369,10 +360,8 @@ public class ImageInfo implements PlugIn {
 
 		String zOrigin = stackSize>1||cal.zOrigin!=0.0?","+d2s(cal.zOrigin):"";
 		String origin = d2s(cal.xOrigin)+","+d2s(cal.yOrigin)+zOrigin;
-		if (!origin.equals("0,0") || cal.getInvertY())
-	    	s += "Coordinate origin:  "+origin+"\n";
-	    if (cal.getInvertY())
-	    	s += "Inverted y coordinates\n";
+		if (!origin.equals("0,0") || cal.getInvertY()) s += "Coordinate origin:  "+origin+"\n";
+	    if (cal.getInvertY()) s += "Inverted y coordinates\n";
 
 	    String pinfo = imp.getPropsInfo();
 	    if (!pinfo.equals("0"))
@@ -447,23 +436,28 @@ public class ImageInfo implements PlugIn {
 	    		s += "  X2: " + IJ.d2s(cal.getX(line.x2d)) + "\n";
 	    		s += "  Y2: " + IJ.d2s(cal.getY(line.y2d, imp.getHeight())) + "\n";
 			} else {
-				Rectangle2D.Double r = roi.getFloatBounds();
-				int decimals = r.x==(int)r.x && r.y==(int)r.y && r.width==(int)r.width && r.height==(int)r.height ?
-						0 : 2;
-				if (cal.scaled()) {
-					s += "  X: " + IJ.d2s(cal.getX(r.x)) + " (" + IJ.d2s(r.x, decimals) + ")\n";
-					s += "  Y: " + IJ.d2s(cal.getY(r.y,imp.getHeight())) + " (" +  IJ.d2s(yy(r.y, imp), decimals) + ")\n";
-					s += "  Width: " + IJ.d2s(r.width*cal.pixelWidth) + " (" +  IJ.d2s(r.width, decimals) + ")\n";
-					s += "  Height: " + IJ.d2s(r.height*cal.pixelHeight) + " (" +  IJ.d2s(r.height, decimals) + ")\n";
-				} else {
-					s += "  X: " + IJ.d2s(r.x, decimals) + "\n";
-					s += "  Y: " + IJ.d2s(yy(r.y, imp), decimals) + "\n";
-					s += "  Width: " + IJ.d2s(r.width, decimals) + "\n";
-					s += "  Height: " + IJ.d2s(r.height, decimals) + "\n";
-				}
+				s = addBounds(imp, s, cal, roi);
 			}
 	    }
 
+		return s;
+	}
+
+	private String addBounds(ImagePlus imp, String s, Calibration cal, Roi roi) {
+		Rectangle2D.Double r = roi.getFloatBounds();
+		int decimals = r.x==(int)r.x && r.y==(int)r.y && r.width==(int)r.width && r.height==(int)r.height ?
+				0 : 2;
+		if (cal.scaled()) {
+			s += "  X: " + IJ.d2s(cal.getX(r.x)) + " (" + IJ.d2s(r.x, decimals) + ")\n";
+			s += "  Y: " + IJ.d2s(cal.getY(r.y, imp.getHeight())) + " (" +  IJ.d2s(yy(r.y, imp), decimals) + ")\n";
+			s += "  Width: " + IJ.d2s(r.width* cal.pixelWidth) + " (" +  IJ.d2s(r.width, decimals) + ")\n";
+			s += "  Height: " + IJ.d2s(r.height* cal.pixelHeight) + " (" +  IJ.d2s(r.height, decimals) + ")\n";
+		} else {
+			s += "  X: " + IJ.d2s(r.x, decimals) + "\n";
+			s += "  Y: " + IJ.d2s(yy(r.y, imp), decimals) + "\n";
+			s += "  Width: " + IJ.d2s(r.width, decimals) + "\n";
+			s += "  Height: " + IJ.d2s(r.height, decimals) + "\n";
+		}
 		return s;
 	}
 
