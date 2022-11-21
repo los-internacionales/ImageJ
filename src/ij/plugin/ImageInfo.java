@@ -175,55 +175,11 @@ public class ImageInfo implements PlugIn {
     		String punit = cal.getUnit()+"^2";
     		if (nonUniformUnits)
     			punit = "("+xunit+" x "+yunit+")";
-	    	dp = Tools.getDecimalPlaces(cal.pixelWidth, cal.pixelHeight);
 	    	s += "Pixel size: "+d2s(cal.pixelWidth)+"x"+d2s(cal.pixelHeight)+" "+punit+"\n";
 	    }
 
-	    s += "ID: "+imp.getID()+"\n";
-	    int type = imp.getType();
-    	switch (type) {
-	    	case ImagePlus.GRAY8:
-	    		s += "Bits per pixel: 8 ";
-	    		String lut = "LUT";
-	    		if (imp.getProcessor().isColorLut())
-	    			lut = "color " + lut;
-	    		else
-	    			lut = "grayscale " + lut;
-	    		if (imp.isInvertedLut())
-	    			lut = "inverting " + lut;
-				s += "(" + lut + ")\n";
-				if (imp.getNChannels()>1)
-					s += displayRanges(imp);
-				else
-					s += "Display range: "+(int)ip.getMin()+"-"+(int)ip.getMax()+"\n";
-				break;
-	    	case ImagePlus.GRAY16: case ImagePlus.GRAY32:
-	    		if (type==ImagePlus.GRAY16) {
-	    			String sign = cal.isSigned16Bit()?"signed":"unsigned";
-	    			s += "Bits per pixel: 16 ("+sign+")\n";
-	    		} else
-	    			s += "Bits per pixel: 32 (float)\n";
-				if (imp.getNChannels()>1)
-					s += displayRanges(imp);
-				else {
-					s += "Display range: ";
-					double min = ip.getMin();
-					double max = ip.getMax();
-					if (cal.calibrated()) {
-						min = cal.getCValue((int)min);
-						max = cal.getCValue((int)max);
-					}
-					s += d2s(min) + " - " + d2s(max) + "\n";
-				}
-				break;
-	    	case ImagePlus.COLOR_256:
-	    		s += "Bits per pixel: 8 (color LUT)\n";
-	    		break;
-	    	case ImagePlus.COLOR_RGB:
-	    		s += "Bits per pixel: 32 (RGB)\n";
-	    		break;
-    	}
-    	String lutName = imp.getProp(LUT.nameKey);
+		s = addDataBytype(imp, ip, s, cal);
+		String lutName = imp.getProp(LUT.nameKey);
     	if (lutName!=null) s += "LUT name: "+lutName+"\n";
 		double interval = cal.frameInterval;
 		double fps = cal.fps;
@@ -241,6 +197,64 @@ public class ImageInfo implements PlugIn {
 
 		s = addRoi(imp, s, cal);
 
+		return s;
+	}
+
+	private String addDataBytype(ImagePlus imp, ImageProcessor ip, String s, Calibration cal) {
+		s += "ID: "+ imp.getID()+"\n";
+		int type = imp.getType();
+		switch (type) {
+			case ImagePlus.GRAY8:
+				s = getGray8Data(imp, ip, s);
+				break;
+			case ImagePlus.GRAY16: case ImagePlus.GRAY32:
+				s = getGrayPlusData(imp, ip, s, cal, type);
+				break;
+			case ImagePlus.COLOR_256:
+				s += "Bits per pixel: 8 (color LUT)\n";
+				break;
+			case ImagePlus.COLOR_RGB:
+				s += "Bits per pixel: 32 (RGB)\n";
+				break;
+		}
+		return s;
+	}
+
+	private String getGray8Data(ImagePlus imp, ImageProcessor ip, String s) {
+		s += "Bits per pixel: 8 ";
+		String lut = "LUT";
+		if (imp.getProcessor().isColorLut())
+			lut = "color " + lut;
+		else
+			lut = "grayscale " + lut;
+		if (imp.isInvertedLut())
+			lut = "inverting " + lut;
+		s += "(" + lut + ")\n";
+		if (imp.getNChannels()>1)
+			s += displayRanges(imp);
+		else
+			s += "Display range: "+(int) ip.getMin()+"-"+(int) ip.getMax()+"\n";
+		return s;
+	}
+
+	private String getGrayPlusData(ImagePlus imp, ImageProcessor ip, String s, Calibration cal, int type) {
+		if (type ==ImagePlus.GRAY16) {
+			String sign = cal.isSigned16Bit()?"signed":"unsigned";
+			s += "Bits per pixel: 16 ("+sign+")\n";
+		} else
+			s += "Bits per pixel: 32 (float)\n";
+		if (imp.getNChannels()>1)
+			s += displayRanges(imp);
+		else {
+			s += "Display range: ";
+			double min = ip.getMin();
+			double max = ip.getMax();
+			if (cal.calibrated()) {
+				min = cal.getCValue((int)min);
+				max = cal.getCValue((int)max);
+			}
+			s += d2s(min) + " - " + d2s(max) + "\n";
+		}
 		return s;
 	}
 
