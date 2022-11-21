@@ -128,15 +128,7 @@ public class FolderOpener implements PlugIn, TextListener {
 		if (arg!=null && !arg.equals(""))
 			directory = arg;
 		else {
-			if (!isMacro) {
-				sortFileNames = staticSortFileNames;
-				openAsVirtualStack = staticOpenAsVirtualStack;
-			}
-			arg = null;
-			String macroOptions = Macro.getOptions();
-			if (macroOptions!=null) {
-				legacyRegex = Macro.getValue(macroOptions, "or", null);
-			}
+			arg = setArgFromMacro(isMacro);
 		}
 		if (arg==null && !showDialog()) return;
 		String[] list = getList(arg, isMacro);
@@ -175,13 +167,7 @@ public class FolderOpener implements PlugIn, TextListener {
 				if (imp != null) {
 					width = imp.getWidth();
 					height = imp.getHeight();
-					if (this.bitDepth == 0) {
-						this.bitDepth = imp.getBitDepth();
-						this.defaultBitDepth = bitDepth;
-					}
-					String info = (String) imp.getProperty("Info");
-					if (info != null && info.contains("7FE0,0010"))
-						dicomImages = true;
+					setInfo(imp);
 					break;
 				}
 			}
@@ -221,10 +207,7 @@ public class FolderOpener implements PlugIn, TextListener {
 						width = stackWidth;
 						height = stackHeight;
 					}
-					if (bitDepth==0)
-						bitDepth = imp.getBitDepth();
-					fi = imp.getOriginalFileInfo();
-					ImageProcessor ip = imp.getProcessor();
+					ImageProcessor ip = setIp(imp);
 					min = ip.getMin();
 					max = ip.getMax();
 					cal = imp.getCalibration();
@@ -246,26 +229,9 @@ public class FolderOpener implements PlugIn, TextListener {
 					allSameCalibration = false;
 				ImageStack inputStack = imp.getStack();
 				Overlay overlay2 = imp.getOverlay();
-				if (overlay2!=null && !openAsVirtualStack) {
-					if (overlay==null)
-						overlay = new Overlay();
-					for (int j=0; j<overlay2.size(); j++) {
-						Roi roi = overlay2.get(j);
-						int position = roi.getPosition();
-						if (position==0)
-							roi.setPosition(count+1);
-						overlay.add(roi);
-					}
-				}				
-				if (openAsVirtualStack) { 
-					if (fileInfoStack) {
-						assert stack instanceof FileInfoVirtualStack;
-						openAsFileInfoStack((FileInfoVirtualStack)stack, directory+list[i]);
-					}
-					else {
-						assert stack instanceof VirtualStack;
-						((VirtualStack)stack).addSlice(list[i]);
-					}
+				overlay = refineOverlay(overlay, count, overlay2);
+				if (openAsVirtualStack) {
+					openInfoStackAsVirtualStack(list, stack, i);
 				} else {
 					for (int slice=1; slice<=stackSize; slice++) {
 						int bitDepth2 = imp.getBitDepth();
@@ -413,6 +379,63 @@ public class FolderOpener implements PlugIn, TextListener {
    					Recorder.recordString("File.openSequence(\""+dir+"\", \""+options+"\");\n");
    				Recorder.disableCommandRecording();
    			}
+		}
+	}
+
+	private Overlay refineOverlay(Overlay overlay, int count, Overlay overlay2) {
+		if (overlay2 !=null && !openAsVirtualStack) {
+			if (overlay ==null) overlay = new Overlay();
+			for (int j = 0; j< overlay2.size(); j++) {
+				Roi roi = overlay2.get(j);
+				int position = roi.getPosition();
+				if (position==0)
+					roi.setPosition(count +1);
+				overlay.add(roi);
+			}
+		}
+		return overlay;
+	}
+
+	private ImageProcessor setIp(ImagePlus imp) {
+		if (bitDepth==0)
+			bitDepth = imp.getBitDepth();
+		fi = imp.getOriginalFileInfo();
+		ImageProcessor ip = imp.getProcessor();
+		return ip;
+	}
+
+	private void setInfo(ImagePlus imp) {
+		if (this.bitDepth == 0) {
+			this.bitDepth = imp.getBitDepth();
+			this.defaultBitDepth = bitDepth;
+		}
+		String info = (String) imp.getProperty("Info");
+		if (info != null && info.contains("7FE0,0010"))
+			dicomImages = true;
+	}
+
+	private String setArgFromMacro(boolean isMacro) {
+		String arg;
+		if (!isMacro) {
+			sortFileNames = staticSortFileNames;
+			openAsVirtualStack = staticOpenAsVirtualStack;
+		}
+		arg = null;
+		String macroOptions = Macro.getOptions();
+		if (macroOptions!=null) {
+			legacyRegex = Macro.getValue(macroOptions, "or", null);
+		}
+		return arg;
+	}
+
+	private void openInfoStackAsVirtualStack(String[] list, ImageStack stack, int i) {
+		if (fileInfoStack) {
+			assert stack instanceof FileInfoVirtualStack;
+			openAsFileInfoStack((FileInfoVirtualStack) stack, directory+ list[i]);
+		}
+		else {
+			assert stack instanceof VirtualStack;
+			((VirtualStack) stack).addSlice(list[i]);
 		}
 	}
 
