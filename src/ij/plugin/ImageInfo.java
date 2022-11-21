@@ -304,34 +304,7 @@ public class ImageInfo implements PlugIn {
 		if (ic!=null) s += "ScaleToFit: " + ic.getScaleToFit() + "\n";
 
 
-	    String valueUnit = cal.getValueUnit();
-	    if (cal.calibrated()) {
-	    	s += " \n";
-	    	int curveFit = cal.getFunction();
-			s += "Calibration function: ";
-			if (curveFit==Calibration.UNCALIBRATED_OD)
-				s += "Uncalibrated OD\n";
-			else if (curveFit==Calibration.CUSTOM)
-				s += "Custom lookup table\n";
-			else
-				s += CurveFitter.fList[curveFit]+"\n";
-			double[] c = cal.getCoefficients();
-			if (c!=null) {
-				s += "  a: "+IJ.d2s(c[0],6)+"\n";
-				s += "  b: "+IJ.d2s(c[1],6)+"\n";
-				if (c.length>=3)
-					s += "  c: "+IJ.d2s(c[2],6)+"\n";
-				if (c.length>=4)
-					s += "  c: "+IJ.d2s(c[3],6)+"\n";
-				if (c.length>=5)
-					s += "  c: "+IJ.d2s(c[4],6)+"\n";
-			}
-			s += "  Unit: \""+valueUnit+"\"\n";
-	    } else if (valueUnit!=null && !valueUnit.equals("Gray Value")) {
-			s += "Calibration function: None\n";
-			s += "  Unit: \""+valueUnit+"\"\n";
-	    } else
-	    	s += "Uncalibrated\n";
+		s = addCalibration(s, cal);
 
 		s = addMetadata(imp, s, cal, stackSize);
 
@@ -339,6 +312,44 @@ public class ImageInfo implements PlugIn {
 
 		s = addRoi(imp, s, cal);
 
+		return s;
+	}
+
+	private static String addCalibration(String s, Calibration cal) {
+		String valueUnit = cal.getValueUnit();
+		if (cal.calibrated()) {
+			s += " \n";
+			int curveFit = cal.getFunction();
+			s += "Calibration function: ";
+			s = addCurveFit(s, cal, curveFit);
+
+			s += "  Unit: \""+valueUnit+"\"\n";
+		} else if (valueUnit!=null && !valueUnit.equals("Gray Value")) {
+			s += "Calibration function: None\n";
+			s += "  Unit: \""+valueUnit+"\"\n";
+		} else
+			s += "Uncalibrated\n";
+		return s;
+	}
+
+	private static String addCurveFit(String s, Calibration cal, int curveFit) {
+		if (curveFit ==Calibration.UNCALIBRATED_OD)
+			s += "Uncalibrated OD\n";
+		else if (curveFit ==Calibration.CUSTOM)
+			s += "Custom lookup table\n";
+		else
+			s += CurveFitter.fList[curveFit]+"\n";
+		double[] c = cal.getCoefficients();
+		if (c!=null) {
+			s += "  a: "+IJ.d2s(c[0],6)+"\n";
+			s += "  b: "+IJ.d2s(c[1],6)+"\n";
+			if (c.length>=3)
+				s += "  c: "+IJ.d2s(c[2],6)+"\n";
+			if (c.length>=4)
+				s += "  c: "+IJ.d2s(c[3],6)+"\n";
+			if (c.length>=5)
+				s += "  c: "+IJ.d2s(c[4],6)+"\n";
+		}
 		return s;
 	}
 
