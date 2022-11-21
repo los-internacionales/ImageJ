@@ -401,45 +401,60 @@ public class ImageInfo implements PlugIn {
 			s += "  X2: " + IJ.d2s(p[2],2) + "\n";
 			s += "  Y2: " + IJ.d2s(p[3],2) + "\n";
 	    } else if (roi instanceof EllipseRoi) {
-	    	s += "\nElliptical selection\n";
-	    	double[] p = ((EllipseRoi)roi).getParams();
-			double dx = p[2] - p[0];
-			double dy = p[3] - p[1];
-			double major = Math.sqrt(dx*dx+dy*dy);
-			s += "  Major: " + IJ.d2s(major,2) + "\n";
-			s += "  Minor: " + IJ.d2s(major*p[4],2) + "\n";
-			s += "  X1: " + IJ.d2s(p[0],2) + "\n";
-			s += "  Y1: " + IJ.d2s(p[1],2) + "\n";
-			s += "  X2: " + IJ.d2s(p[2],2) + "\n";
-			s += "  Y2: " + IJ.d2s(p[3],2) + "\n";
-			s += "  Aspect ratio: " + IJ.d2s(p[4],2) + "\n";
-	    } else {
-	    	s += " \n";
-	    	s += roi.getTypeAsString()+" Selection";
-	    	String points = null;
-			if (roi instanceof PointRoi) {
-				int npoints = ((PolygonRoi)roi).getNCoordinates();
-				String suffix = npoints>1?"s)":")";
-				points = " (" + npoints + " point" + suffix;
-			}
-    		String name = roi.getName();
-    		if (name!=null) {
-				s += " (\"" + name + "\")";
-				if (points!=null) s += "\n " + points;
-			} else if (points!=null)
-				s += points;
-			s += "\n";
-	    	if (roi instanceof Line) {
-	    		Line line = (Line)roi;
-	    		s += "  X1: " + IJ.d2s(cal.getX(line.x1d)) + "\n";
-	    		s += "  Y1: " + IJ.d2s(cal.getY(line.y1d, imp.getHeight())) + "\n";
-	    		s += "  X2: " + IJ.d2s(cal.getX(line.x2d)) + "\n";
-	    		s += "  Y2: " + IJ.d2s(cal.getY(line.y2d, imp.getHeight())) + "\n";
-			} else {
-				s = addBounds(imp, s, cal, roi);
-			}
-	    }
+			s = addEllipse(s, (EllipseRoi) roi);
+		} else {
+			s = addPolygon(imp, s, cal, roi);
+		}
 
+		return s;
+	}
+
+	private static String addEllipse(String s, EllipseRoi roi) {
+		s += "\nElliptical selection\n";
+		double[] p = roi.getParams();
+		double dx = p[2] - p[0];
+		double dy = p[3] - p[1];
+		double major = Math.sqrt(dx*dx+dy*dy);
+		s += "  Major: " + IJ.d2s(major,2) + "\n";
+		s += "  Minor: " + IJ.d2s(major*p[4],2) + "\n";
+		s += "  X1: " + IJ.d2s(p[0],2) + "\n";
+		s += "  Y1: " + IJ.d2s(p[1],2) + "\n";
+		s += "  X2: " + IJ.d2s(p[2],2) + "\n";
+		s += "  Y2: " + IJ.d2s(p[3],2) + "\n";
+		s += "  Aspect ratio: " + IJ.d2s(p[4],2) + "\n";
+		return s;
+	}
+
+	private String addPolygon(ImagePlus imp, String s, Calibration cal, Roi roi) {
+		s += " \n";
+		s += roi.getTypeAsString()+" Selection";
+		String points = null;
+		if (roi instanceof PointRoi) {
+			int npoints = ((PolygonRoi) roi).getNCoordinates();
+			String suffix = npoints>1?"s)":")";
+			points = " (" + npoints + " point" + suffix;
+		}
+		String name = roi.getName();
+		if (name!=null) {
+			s += " (\"" + name + "\")";
+			if (points!=null) s += "\n " + points;
+		} else if (points!=null)
+			s += points;
+		s += "\n";
+		s = addLine(imp, s, cal, roi);
+		return s;
+	}
+
+	private String addLine(ImagePlus imp, String s, Calibration cal, Roi roi) {
+		if (roi instanceof Line) {
+			Line line = (Line) roi;
+			s += "  X1: " + IJ.d2s(cal.getX(line.x1d)) + "\n";
+			s += "  Y1: " + IJ.d2s(cal.getY(line.y1d, imp.getHeight())) + "\n";
+			s += "  X2: " + IJ.d2s(cal.getX(line.x2d)) + "\n";
+			s += "  Y2: " + IJ.d2s(cal.getY(line.y2d, imp.getHeight())) + "\n";
+		} else {
+			s = addBounds(imp, s, cal, roi);
+		}
 		return s;
 	}
 
