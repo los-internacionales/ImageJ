@@ -363,16 +363,21 @@ public class ImageInfo implements PlugIn {
 		if (!origin.equals("0,0") || cal.getInvertY()) s += "Coordinate origin:  "+origin+"\n";
 	    if (cal.getInvertY()) s += "Inverted y coordinates\n";
 
-	    String pinfo = imp.getPropsInfo();
-	    if (!pinfo.equals("0"))
-	   		s += "Properties: " + pinfo + "\n";
-	   	else
-	   		s += "No properties\n";
+		s = addPInfo(imp, s);
 
 		s = addOverlay(imp, s);
 
 		s = addRoi(imp, s, cal);
 
+		return s;
+	}
+
+	private static String addPInfo(ImagePlus imp, String s) {
+		String pinfo = imp.getPropsInfo();
+		if (!pinfo.equals("0"))
+			   s += "Properties: " + pinfo + "\n";
+		   else
+			   s += "No properties\n";
 		return s;
 	}
 
