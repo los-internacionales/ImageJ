@@ -232,33 +232,16 @@ public class FolderOpener implements PlugIn, TextListener {
 					stack = getImageStack(width, height, stackSize, null, cm);
 					info1 = (String)imp.getProperty("Info");
 				}
-				if (imp==null)
-					continue;
+				if (imp==null) continue;
 				if (imp.getWidth()!=width || imp.getHeight()!=height) {
 					if (stackWidth>0 && stackHeight>0) {
-						ImagePlus imp2 = imp.createImagePlus();
-						ImageProcessor ip = imp.getProcessor();
-						ImageProcessor ip2 = ip.createProcessor(width,height);
-						ip2.insert(ip, 0, 0);
-						imp2.setProcessor(ip2);
-						imp = imp2;
+						imp = refineImp(width, height, imp);
 					} else {
 						IJ.log(list[i] + ": wrong size; "+width+"x"+height+" expected, "+imp.getWidth()+"x"+imp.getHeight()+" found");
 						continue;
 					}
 				}
-				String label = imp.getTitle();
-				if (stackSize==1) {
-					String info = (String)imp.getProperty("Info");
-					if (info!=null) {
-						if (useInfo(info))
-							label += "\n" + info;
-					} else if (imp.getStackSize()>0) {
-						String sliceLabel = imp.getStack().getSliceLabel(1);
-						if (useInfo(sliceLabel))
-							label =  sliceLabel;
-					}
-				}
+				String label = getLabel(stackSize, imp);
 				if (Math.abs(imp.getCalibration().pixelWidth-cal.pixelWidth)>0.0000000001)
 					allSameCalibration = false;
 				ImageStack inputStack = imp.getStack();
@@ -431,6 +414,32 @@ public class FolderOpener implements PlugIn, TextListener {
    				Recorder.disableCommandRecording();
    			}
 		}
+	}
+
+	private static String getLabel(int stackSize, ImagePlus imp) {
+		String label = imp.getTitle();
+		if (stackSize ==1) {
+			String info = (String) imp.getProperty("Info");
+			if (info!=null) {
+				if (useInfo(info))
+					label += "\n" + info;
+			} else if (imp.getStackSize()>0) {
+				String sliceLabel = imp.getStack().getSliceLabel(1);
+				if (useInfo(sliceLabel))
+					label =  sliceLabel;
+			}
+		}
+		return label;
+	}
+
+	private static ImagePlus refineImp(int width, int height, ImagePlus imp) {
+		ImagePlus imp2 = imp.createImagePlus();
+		ImageProcessor ip = imp.getProcessor();
+		ImageProcessor ip2 = ip.createProcessor(width, height);
+		ip2.insert(ip, 0, 0);
+		imp2.setProcessor(ip2);
+		imp = imp2;
+		return imp;
 	}
 
 	private ImageStack getImageStack(int width, int height, int stackSize, ImageStack stack, ColorModel cm) {
