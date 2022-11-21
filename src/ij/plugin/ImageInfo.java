@@ -383,29 +383,39 @@ public class ImageInfo implements PlugIn {
 		if (interp!=null)
 			s += "Macro is running"+(Interpreter.isBatchMode()?" in batch mode":"")+"\n";
 
-	    Roi roi = imp.getRoi();
-	    if (roi == null) {
+		s = addRoi(imp, s, cal);
+
+		return s;
+	}
+
+	private String addRoi(ImagePlus imp, String s, Calibration cal) {
+		Roi roi = imp.getRoi();
+		if (roi == null) {
 			if (cal.calibrated())
-	    		s += " \n";
-	    	s += "No selection\n";
-	    } else if (roi instanceof RotatedRectRoi) {
-	    	s += "\nRotated rectangle selection\n";
-	    	double[] p = ((RotatedRectRoi)roi).getParams();
-			double dx = p[2] - p[0];
-			double dy = p[3] - p[1];
-			double major = Math.sqrt(dx*dx+dy*dy);
-			s += "  Length: " + IJ.d2s(major,2) + "\n";
-			s += "  Width: " + IJ.d2s(p[4],2) + "\n";
-			s += "  X1: " + IJ.d2s(p[0],2) + "\n";
-			s += "  Y1: " + IJ.d2s(p[1],2) + "\n";
-			s += "  X2: " + IJ.d2s(p[2],2) + "\n";
-			s += "  Y2: " + IJ.d2s(p[3],2) + "\n";
-	    } else if (roi instanceof EllipseRoi) {
+				s += " \n";
+			s += "No selection\n";
+		} else if (roi instanceof RotatedRectRoi) {
+			s = addRectangle(s, (RotatedRectRoi) roi);
+		} else if (roi instanceof EllipseRoi) {
 			s = addEllipse(s, (EllipseRoi) roi);
 		} else {
 			s = addPolygon(imp, s, cal, roi);
 		}
+		return s;
+	}
 
+	private static String addRectangle(String s, RotatedRectRoi roi) {
+		s += "\nRotated rectangle selection\n";
+		double[] p = roi.getParams();
+		double dx = p[2] - p[0];
+		double dy = p[3] - p[1];
+		double major = Math.sqrt(dx*dx+dy*dy);
+		s += "  Length: " + IJ.d2s(major,2) + "\n";
+		s += "  Width: " + IJ.d2s(p[4],2) + "\n";
+		s += "  X1: " + IJ.d2s(p[0],2) + "\n";
+		s += "  Y1: " + IJ.d2s(p[1],2) + "\n";
+		s += "  X2: " + IJ.d2s(p[2],2) + "\n";
+		s += "  Y2: " + IJ.d2s(p[3],2) + "\n";
 		return s;
 	}
 
