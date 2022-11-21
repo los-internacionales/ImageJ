@@ -28,11 +28,17 @@ import ij.measure.ResultsTable;
 public class Plot implements Cloneable {
 
 	/** Text justification. */
-	public static final int LEFT=ImageProcessor.LEFT_JUSTIFY, CENTER=ImageProcessor.CENTER_JUSTIFY, RIGHT=ImageProcessor.RIGHT_JUSTIFY;
+	public static final int LEFT=ImageProcessor.LEFT_JUSTIFY;
+	public static final int CENTER=ImageProcessor.CENTER_JUSTIFY;
+	public static final int RIGHT=ImageProcessor.RIGHT_JUSTIFY;
 	/** Legend positions */
 	//NOTE: These have only bits of LEGEND_POSITION_MASK set. The flags of the legend are stored as flags of the legend PlotObject.
 	//These are saved in the flags of the PlotObject class; thus bits up to 0x0f are reserved
-	public static final int TOP_LEFT=0x90, TOP_RIGHT=0xA0, BOTTOM_LEFT=0xB0, BOTTOM_RIGHT=0xC0, AUTO_POSITION=0x80;
+	public static final int TOP_LEFT=0x90;
+	public static final int TOP_RIGHT=0xA0;
+	public static final int BOTTOM_LEFT=0xB0;
+	public static final int BOTTOM_RIGHT=0xC0;
+	public static final int AUTO_POSITION=0x80;
 	/** Masks out bits for legend positions; if all these bits are off, the legend is turned off */
 	static final int LEGEND_POSITION_MASK = 0xf0;
 	/** Legend has its curves in bottom-to-top sequence (otherwise top to bottom) */
@@ -152,10 +158,10 @@ public class Plot implements Cloneable {
 	static final float DEFAULT_FRAME_LINE_WIDTH = 1.0001f; //Frame thickness
 	private static final int MIN_X_GRIDSPACING = 45;	//minimum distance between grid lines or ticks along x at plot width 0
 	private static final int MIN_Y_GRIDSPACING = 30;	//minimum distance between grid lines or ticks along y at plot height 0
-	private final double MIN_LOG_RATIO = 3;				//If max/min ratio is less than this, force linear axis even if log required. should be >2
 	private static final int LEGEND_PADDING = 4;		//pixels around legend text etc
 	private static final int LEGEND_LINELENGTH = 20;	//length of lines in legend
-	private static final int USUALLY_ENLARGE = 1, ALWAYS_ENLARGE = 2; //enlargeRange settings
+	private static final int USUALLY_ENLARGE = 1;
+	private static final int ALWAYS_ENLARGE = 2; //enlargeRange settings
 	private static final double RELATIVE_ARROWHEAD_SIZE = 0.2; //arrow heads have 1/5 of vector length
 	private static final int MIN_ARROWHEAD_LENGTH = 3;
 	private static final int MAX_ARROWHEAD_LENGTH = 20;
@@ -163,7 +169,7 @@ public class Plot implements Cloneable {
 
 	PlotProperties pp = new PlotProperties();		//size, range, formatting etc, for easy serialization
 	PlotProperties ppSnapshot;						//copy for reverting
-	Vector<PlotObject> allPlotObjects = new Vector<PlotObject>();	//all curves, labels etc., also serialized for saving/reading
+	Vector<PlotObject> allPlotObjects = new Vector<>();	//all curves, labels etc., also serialized for saving/reading
 	Vector<PlotObject> allPlotObjectsSnapshot;      //copy for reverting
 	private PlotVirtualStack stack;
 	/** For high-resolution plots, everything will be scaled with this number. Otherwise, must be 1.0.
@@ -171,7 +177,10 @@ public class Plot implements Cloneable {
 	float scale = 1.0f;
 	Rectangle frame = null;							//the clip frame, do not use for image scale
 	//The following are the margin sizes actually used. They are modified for font size and also scaled for high-resolution plots
-	int leftMargin = LEFT_MARGIN, rightMargin = RIGHT_MARGIN, topMargin = TOP_MARGIN, bottomMargin = BOTTOM_MARGIN;
+	int leftMargin = LEFT_MARGIN;
+	int rightMargin = RIGHT_MARGIN;
+	int topMargin = TOP_MARGIN;
+	int bottomMargin = BOTTOM_MARGIN;
 	int frameWidth;									//width corresponding to plot range; frame.width is larger by 1
 	int frameHeight;								//height corresponding to plot range; frame.height is larger by 1
 	int preferredPlotWidth = PlotWindow.plotWidth;  //default size of plot frame (not taking 'High-Resolution' scale factor into account)
@@ -182,10 +191,11 @@ public class Plot implements Cloneable {
 	double[] defaultMinMax = new double[]{Double.NaN, 0, Double.NaN, 0}; //default plot range
 	double[] savedMinMax = new double[]{Double.NaN, 0, Double.NaN, 0};	//keeps previous range for revert
 	int[] enlargeRange;                             // whether to enlarge the range slightly to avoid values at the border (0=off, USUALLY_ENLARGE, ALWAYS_ENLARGE)
-	boolean logXAxis, logYAxis;                     // whether to really use log axis (never for small relative range)
+	boolean logXAxis;
+	boolean logYAxis;                     // whether to really use log axis (never for small relative range)
 	//for passing on what should be kept when 'live' plotting (PlotMaker), but note that 'COPY_EXTRA_OBJECTS' is also on for live plotting:
 	int templateFlags = COPY_SIZE | COPY_LABELS | COPY_AXIS_STYLE | COPY_CONTENTS_STYLE | COPY_LEGEND;
-	private int dsize = PlotWindow.getDefaultFontSize();
+	private final int dsize = PlotWindow.getDefaultFontSize();
 	Font defaultFont = FontUtil.getFont("Arial",Font.PLAIN,dsize); //default font for labels, axis, etc.
 	Font currentFont = defaultFont;                 // font as changed by setFont or setFontSize, must never be null
 	private double xScale, yScale;                  // pixels per data unit
@@ -205,8 +215,6 @@ public class Plot implements Cloneable {
 	float currentLineWidth;
 	private int currentJustification = LEFT;
 	private boolean ignoreForce2Grid;               // after explicit setting of range (limits), ignore 'FORCE2GRID' flags
-	//private boolean snapToMinorGrid;  			// snap to grid when zooming to selection
-	private static double SEPARATED_BAR_WIDTH=0.5;  // for plots with separate bars (e.g. categories), fraction of space, 0.1-1.0
 	double[] steps;                                 // x & y interval between numbers, major ticks & grid lines, remembered for redrawing the grid
 	private int objectToReplace = -1;               // index in allPlotObjects, for replace
 	private Point2D.Double textLoc;                 // remembers position of previous addLabel call (replaces text if at the same position)
@@ -2047,6 +2055,8 @@ public class Plot implements Cloneable {
 			//no log range if range is too small or not positive values
 			if (logAxis) {
 				double rangeRatio = currentMinMax[i+1]/currentMinMax[i];
+				//If max/min ratio is less than this, force linear axis even if log required. should be >2
+				double MIN_LOG_RATIO = 3;
 				if (!(rangeRatio > MIN_LOG_RATIO || 1./rangeRatio > MIN_LOG_RATIO) ||
 					!(currentMinMax[i] > 10*Float.MIN_VALUE)  || !(currentMinMax[i+1] > 10*Float.MIN_VALUE))
 				logAxis = false;
@@ -2487,8 +2497,7 @@ public class Plot implements Cloneable {
 	 *	The grid or major tick spacing in each direction is given by steps */
 	void drawAxesTicksGridNumbers(double[] steps) {
 
-		if (ip==null)
-			return;
+		if (ip==null) return;
 		String[] xCats = labelsInBraces('x');   // create categories for the axes (if any)
 		String[] yCats = labelsInBraces('y');
 		String multiplySymbol = getMultiplySymbol(); // for scientific notation
@@ -2499,6 +2508,11 @@ public class Plot implements Cloneable {
 		FontMetrics fm = ip.getFontMetrics();
 		int fontAscent = fm.getAscent();
 		ip.setJustification(LEFT);
+		int yOfXAxisNumbers = getyOfXAxisNumbers(steps, xCats, multiplySymbol, scFont, scFontMedium, scFontSmall, fm, fontAscent);
+		plotYAxis(steps, xCats, yCats, multiplySymbol, scFont, scFontMedium, scFontSmall, fm, fontAscent, yOfXAxisNumbers);
+	}
+
+	private int getyOfXAxisNumbers(double[] steps, String[] xCats, String multiplySymbol, Font scFont, Font scFontMedium, Font scFontSmall, FontMetrics fm, int fontAscent) {
 		// ---	A l o n g	X	A x i s
 		int yOfXAxisNumbers = topMargin + frameHeight + fm.getHeight()*5/4 + sc(2);
 		if (hasFlag(X_NUMBERS | (logXAxis ? (X_TICKS | X_MINOR_TICKS) : X_LOG_TICKS) + X_GRID)) {
@@ -2520,90 +2534,116 @@ public class Plot implements Cloneable {
 					ip.drawString(s, xBasePxl-ip.getStringWidth(s)/2, yOfXAxisNumbers);
 				}
 			} else {
-				if (hasFlag(X_NUMBERS)) {
-					int w1 = ip.getStringWidth(IJ.d2s(currentMinMax[0], logXAxis ? -1 : digits));
-					int w2 = ip.getStringWidth(IJ.d2s(currentMinMax[1], logXAxis ? -1 : digits));
-					int wMax = Math.max(w1,w2);
-					if (wMax > Math.abs(step*xScale)-sc(8)) {
-						baseFont = scFontMedium;   //small font if there is not enough space for the numbers
-						ip.setFont(baseFont);
-					}
-				}
+				extractHasFlag(xCats, multiplySymbol, scFontMedium, scFontSmall, fm, fontAscent, yOfXAxisNumbers, baseFont, majorTicks, minorTicks, step, i1, i2, digits, y1, y2);
+			}
+		}
+		return yOfXAxisNumbers;
+	}
 
-				for (int i=0; i<=(i2-i1); i++) {
-					double v = (i+i1)*step;
+	private void extractHasFlag(String[] xCats, String multiplySymbol, Font scFontMedium, Font scFontSmall, FontMetrics fm, int fontAscent, int yOfXAxisNumbers, Font baseFont, boolean majorTicks, boolean minorTicks, double step, int i1, int i2, int digits, int y1, int y2) {
+		baseFont = getFont(scFontMedium, baseFont, step, digits);
+
+		for (int i = 0; i<=(i2 - i1); i++) {
+			double v = (i+ i1)* step;
+			int x = (int)Math.round((v - xMin)*xScale) + leftMargin;
+
+			if (xCats != null) {
+				int index = (int) v;
+				double remainder =  Math.abs(v - Math.round(v));
+				if(index >= 0 && index < xCats.length  && remainder < 1e-9){
+					String s = xCats[index];
+					String[] parts = s.split("\n");
+					int w = 0;
+					for(int jj = 0; jj < parts.length; jj++)
+						w = Math.max(w, ip.getStringWidth(parts[jj]));
+
+					ip.drawString(s, x-w/2, yOfXAxisNumbers);
+				}
+				continue;
+			}
+
+			hasFlagX(multiplySymbol, scFontSmall, fontAscent, yOfXAxisNumbers, baseFont, majorTicks, digits, y1, y2, v, x);
+		}
+		extractMinorNumbers(multiplySymbol, scFontSmall, fm, fontAscent, yOfXAxisNumbers, baseFont, majorTicks, minorTicks, step, i1, i2, y1, y2);
+	}
+
+	private Font getFont(Font scFontMedium, Font baseFont, double step, int digits) {
+		if (hasFlag(X_NUMBERS)) {
+			int w1 = ip.getStringWidth(IJ.d2s(currentMinMax[0], logXAxis ? -1 : digits));
+			int w2 = ip.getStringWidth(IJ.d2s(currentMinMax[1], logXAxis ? -1 : digits));
+			int wMax = Math.max(w1,w2);
+			if (wMax > Math.abs(step *xScale)-sc(8)) {
+				baseFont = scFontMedium;   //small font if there is not enough space for the numbers
+				ip.setFont(baseFont);
+			}
+		}
+		return baseFont;
+	}
+
+	private void hasFlagX(String multiplySymbol, Font scFontSmall, int fontAscent, int yOfXAxisNumbers, Font baseFont, boolean majorTicks, int digits, int y1, int y2, double v, int x) {
+		if (hasFlag(X_GRID)) {
+			ip.setColor(gridColor);
+			ip.drawLine(x, y1, x, y2);
+			ip.setColor(Color.black);
+		}
+		if (majorTicks) {
+			ip.drawLine(x, y1, x, y1 +sc(tickLength));
+			ip.drawLine(x, y2, x, y2 -sc(tickLength));
+		}
+		if (hasFlag(X_NUMBERS)) {
+			if (logXAxis || digits <0) {
+				drawExpString(logXAxis ? Math.pow(10, v) : v, logXAxis ? -1 : -digits,
+						x, yOfXAxisNumbers - fontAscent /2, CENTER, fontAscent, baseFont, scFontSmall, multiplySymbol);
+			} else {
+				String s = IJ.d2s(v, digits);
+				ip.drawString(s, x -ip.getStringWidth(s)/2, yOfXAxisNumbers);
+			}
+		}
+	}
+
+	private void extractMinorNumbers(String multiplySymbol, Font scFontSmall, FontMetrics fm, int fontAscent, int yOfXAxisNumbers, Font baseFont, boolean majorTicks, boolean minorTicks, double step, int i1, int i2, int y1, int y2) {
+		boolean haveMinorLogNumbers = i2 - i1 < 2;		//nunbers on log minor ticks only if < 2 decades
+		if (minorTicks && (!logXAxis || step > 1.1)) {  //'standard' log minor ticks only for full decades
+			double mstep = niceNumber(step *0.19);       //non-log: 4 or 5 minor ticks per major tick
+			double minorPerMajor = step /mstep;
+			if (Math.abs(minorPerMajor-Math.round(minorPerMajor)) > 1e-10) //major steps are not an integer multiple of minor steps? (e.g. user step 90 deg)
+				mstep = step /4;
+			if (logXAxis && mstep < 1) mstep = 1;
+			i1 = (int)Math.ceil (Math.min(xMin,xMax)/mstep-1.e-10);
+			i2 = (int)Math.floor(Math.max(xMin,xMax)/mstep+1.e-10);
+			for (int i = i1; i<= i2; i++) {
+				double v = i*mstep;
+				int x = (int)Math.round((v - xMin)*xScale) + leftMargin;
+				ip.drawLine(x, y1, x, y1 +sc(minorTickLength));
+				ip.drawLine(x, y2, x, y2 -sc(minorTickLength));
+			}
+		} else if (logXAxis && majorTicks && Math.abs(xScale)>sc(MIN_X_GRIDSPACING)) {		//minor ticks for log
+			setLogXAxis(multiplySymbol, scFontSmall, fm, fontAscent, yOfXAxisNumbers, baseFont, y1, y2, haveMinorLogNumbers);
+		}
+	}
+
+	private void setLogXAxis(String multiplySymbol, Font scFontSmall, FontMetrics fm, int fontAscent, int yOfXAxisNumbers, Font baseFont, int y1, int y2, boolean haveMinorLogNumbers) {
+		int i1;
+		int i2;
+		int minorNumberLimit = haveMinorLogNumbers ? (int)(0.12*Math.abs(xScale)/(fm.charWidth('0')+sc(2))) : 0;   //more numbers on minor ticks when zoomed in
+		i1 = (int)Math.floor(Math.min(xMin,xMax)-1.e-10);
+		i2 = (int)Math.ceil (Math.max(xMin,xMax)+1.e-10);
+		for (int i=i1; i<=i2; i++) {
+			for (int m=2; m<10; m++) {
+				double v = i+Math.log10(m);
+				if (v > Math.min(xMin,xMax) && v < Math.max(xMin,xMax)) {
 					int x = (int)Math.round((v - xMin)*xScale) + leftMargin;
-
-					if (xCats!= null) {
-						int index = (int) v;
-						double remainder =  Math.abs(v - Math.round(v));
-						if(index >= 0 && index < xCats.length  && remainder < 1e-9){
-							String s = xCats[index];
-							String[] parts = s.split("\n");
-							int w = 0;
-							for(int jj = 0; jj < parts.length; jj++)
-								w = Math.max(w, ip.getStringWidth(parts[jj]));
-
-							ip.drawString(s, x-w/2, yOfXAxisNumbers);
-							//ip.drawString(s, x-ip.getStringWidth(s)/2, yOfXAxisNumbers);
-						}
-						continue;
-					}
-
-					if (hasFlag(X_GRID)) {
-						ip.setColor(gridColor);
-						ip.drawLine(x, y1, x, y2);
-						ip.setColor(Color.black);
-					}
-					if (majorTicks) {
-						ip.drawLine(x, y1, x, y1+sc(tickLength));
-						ip.drawLine(x, y2, x, y2-sc(tickLength));
-					}
-					if (hasFlag(X_NUMBERS)) {
-						if (logXAxis || digits<0) {
-							drawExpString(logXAxis ? Math.pow(10,v) : v, logXAxis ? -1 : -digits,
-									x, yOfXAxisNumbers-fontAscent/2, CENTER, fontAscent, baseFont, scFontSmall, multiplySymbol);
-						} else {
-							String s = IJ.d2s(v,digits);
-							ip.drawString(s, x-ip.getStringWidth(s)/2, yOfXAxisNumbers);
-						}
-					}
-				}
-				boolean haveMinorLogNumbers = i2-i1 < 2;		//nunbers on log minor ticks only if < 2 decades
-				if (minorTicks && (!logXAxis || step > 1.1)) {  //'standard' log minor ticks only for full decades
-					double mstep = niceNumber(step*0.19);       //non-log: 4 or 5 minor ticks per major tick
-					double minorPerMajor = step/mstep;
-					if (Math.abs(minorPerMajor-Math.round(minorPerMajor)) > 1e-10) //major steps are not an integer multiple of minor steps? (e.g. user step 90 deg)
-						mstep = step/4;
-					if (logXAxis && mstep < 1) mstep = 1;
-					i1 = (int)Math.ceil (Math.min(xMin,xMax)/mstep-1.e-10);
-					i2 = (int)Math.floor(Math.max(xMin,xMax)/mstep+1.e-10);
-					for (int i=i1; i<=i2; i++) {
-						double v = i*mstep;
-						int x = (int)Math.round((v - xMin)*xScale) + leftMargin;
-						ip.drawLine(x, y1, x, y1+sc(minorTickLength));
-						ip.drawLine(x, y2, x, y2-sc(minorTickLength));
-					}
-				} else if (logXAxis && majorTicks && Math.abs(xScale)>sc(MIN_X_GRIDSPACING)) {		//minor ticks for log
-					int minorNumberLimit = haveMinorLogNumbers ? (int)(0.12*Math.abs(xScale)/(fm.charWidth('0')+sc(2))) : 0;   //more numbers on minor ticks when zoomed in
-					i1 = (int)Math.floor(Math.min(xMin,xMax)-1.e-10);
-					i2 = (int)Math.ceil (Math.max(xMin,xMax)+1.e-10);
-					for (int i=i1; i<=i2; i++) {
-						for (int m=2; m<10; m++) {
-							double v = i+Math.log10(m);
-							if (v > Math.min(xMin,xMax) && v < Math.max(xMin,xMax)) {
-								int x = (int)Math.round((v - xMin)*xScale) + leftMargin;
-								ip.drawLine(x, y1, x, y1+sc(minorTickLength));
-								ip.drawLine(x, y2, x, y2-sc(minorTickLength));
-								if (m<=minorNumberLimit)
-									drawExpString(Math.pow(10,v), 0, x, yOfXAxisNumbers-fontAscent/2, CENTER,
-											fontAscent, baseFont, scFontSmall, multiplySymbol);
-							}
-						}
-					}
+					ip.drawLine(x, y1, x, y1 +sc(minorTickLength));
+					ip.drawLine(x, y2, x, y2 -sc(minorTickLength));
+					if (m<=minorNumberLimit)
+						drawExpString(Math.pow(10,v), 0, x, yOfXAxisNumbers - fontAscent /2, CENTER,
+								fontAscent, baseFont, scFontSmall, multiplySymbol);
 				}
 			}
 		}
+	}
+
+	private void plotYAxis(double[] steps, String[] xCats, String[] yCats, String multiplySymbol, Font scFont, Font scFontMedium, Font scFontSmall, FontMetrics fm, int fontAscent, int yOfXAxisNumbers) {
 		// ---	A l o n g	Y	A x i s
 		ip.setFont(scFont);
 		int maxNumWidth = 0;
@@ -2628,7 +2668,7 @@ public class Plot implements Cloneable {
 					String s = IJ.d2s(yMin,getDigits(yMin, 0.001*yMin, 5, suggestedDigits));
 					maxNumWidth = ip.getStringWidth(s);
 					int y = yBasePxl;
-					ip.drawString(s, xNumberRight, y+fontAscent/2+sc(1));
+					ip.drawString(s, xNumberRight, y+ fontAscent /2+sc(1));
 				}
 			} else {
 				int digitsForWidth = logYAxis ? -1 : digits;
@@ -2639,98 +2679,16 @@ public class Plot implements Cloneable {
 				String str1 = IJ.d2s(currentMinMax[2], digitsForWidth);
 				String str2 = IJ.d2s(currentMinMax[3], digitsForWidth);
 				if (digitsForWidth < 0) {
-					str1 = str1.replaceFirst("E",multiplySymbol);
-					str2 = str2.replaceFirst("E",multiplySymbol);
+					str1 = str1.replaceFirst("E", multiplySymbol);
+					str2 = str2.replaceFirst("E", multiplySymbol);
 				}
-				int w1 = ip.getStringWidth(str1);
-				int w2 = ip.getStringWidth(str2);
-				int wMax = Math.max(w1,w2);
-				if (hasFlag(Y_NUMBERS)) {
-					if (wMax > xNumberRight - sc(4) - (pp.yLabel.label.length()>0 ? fm.getHeight() : 0)) {
-						baseFont = scFontMedium;   //small font if there is not enough space for the numbers
-						ip.setFont(baseFont);
-					}
-				}
-				//IJ.log(IJ.d2s(currentMinMax[2],digits)+": w="+w1+"; "+IJ.d2s(currentMinMax[3],digits)+": w="+w2+baseFont+" Space="+(leftMargin-sc(4+5)-fm.getHeight()));
-				for (int i=i1; i<=i2; i++) {
-					double v = step==0 ? yMin : i*step;
-					int y = topMargin + frameHeight - (int)Math.round((v - yMin)*yScale);
-
-					if (yCats != null){
-						int index = (int) v;
-						double remainder =  Math.abs(v - Math.round(v));
-						if(index >= 0 && index < yCats.length  && remainder < 1e-9){
-							String s = yCats[index];
-							int multiLineOffset = 0; // multi-line cat labels
-							for(int jj = 0; jj < s.length(); jj++)
-								if(s.charAt(jj) == '\n')
-									multiLineOffset -= rect.height/2;
-
-							ip.drawString(s, xNumberRight, y+yNumberOffset+ multiLineOffset);
-						}
-						continue;
-					}
-
-					if (hasFlag(Y_GRID)) {
-						ip.setColor(gridColor);
-						ip.drawLine(x1, y, x2, y);
-						ip.setColor(Color.black);
-					}
-					if (majorTicks) {
-						ip.drawLine(x1, y, x1+sc(tickLength), y);
-						ip.drawLine(x2, y, x2-sc(tickLength), y);
-					}
-					if (hasFlag(Y_NUMBERS)) {
-						int w = 0;
-						if (logYAxis || digits<0) {
-							w = drawExpString(logYAxis ? Math.pow(10,v) : v, logYAxis ? -1 : -digits,
-									xNumberRight, y, RIGHT, fontAscent, baseFont, scFontSmall, multiplySymbol);
-						} else {
-							String s = IJ.d2s(v,digits);
-							w = ip.getStringWidth(s);
-							ip.drawString(s, xNumberRight, y+yNumberOffset);
-						}
-						if (w > maxNumWidth) maxNumWidth = w;
-					}
-				}
-				boolean haveMinorLogNumbers = i2-i1 < 2;        //numbers on log minor ticks only if < 2 decades
-				if (minorTicks && (!logYAxis || step > 1.1)) {  //'standard' log minor ticks only for full decades
-					double mstep = niceNumber(step*0.19);       //non-log: 4 or 5 minor ticks per major tick
-					double minorPerMajor = step/mstep;
-					if (Math.abs(minorPerMajor-Math.round(minorPerMajor)) > 1e-10) //major steps are not an integer multiple of minor steps? (e.g. user step 90 deg)
-						mstep = step/4;
-					if (logYAxis && step < 1) mstep = 1;
-					i1 = (int)Math.ceil (Math.min(yMin,yMax)/mstep-1.e-10);
-					i2 = (int)Math.floor(Math.max(yMin,yMax)/mstep+1.e-10);
-					for (int i=i1; i<=i2; i++) {
-						double v = i*mstep;
-						int y = topMargin + frameHeight - (int)Math.round((v - yMin)*yScale);
-						ip.drawLine(x1, y, x1+sc(minorTickLength), y);
-						ip.drawLine(x2, y, x2-sc(minorTickLength), y);
-					}
-				}
-				if (logYAxis && majorTicks && Math.abs(yScale)>sc(MIN_X_GRIDSPACING)) {		 //minor ticks for log within the decade
-					int minorNumberLimit = haveMinorLogNumbers ? (int)(0.4*Math.abs(yScale)/fm.getHeight()) : 0;	//more numbers on minor ticks when zoomed in
-					i1 = (int)Math.floor(Math.min(yMin,yMax)-1.e-10);
-					i2 = (int)Math.ceil(Math.max(yMin,yMax)+1.e-10);
-					for (int i=i1; i<=i2; i++) {
-						for (int m=2; m<10; m++) {
-							double v = i+Math.log10(m);
-							if (v > Math.min(yMin,yMax) && v < Math.max(yMin,yMax)) {
-								int y = topMargin + frameHeight - (int)Math.round((v - yMin)*yScale);
-								ip.drawLine(x1, y, x1+sc(minorTickLength), y);
-								ip.drawLine(x2, y, x2-sc(minorTickLength), y);
-								if (m<=minorNumberLimit) {
-									int w = drawExpString(Math.pow(10,v), 0, xNumberRight, y, RIGHT,
-											fontAscent, baseFont, scFontSmall, multiplySymbol);
-									if (w > maxNumWidth) maxNumWidth = w;
-								}
-							}
-						}
-					}
-				}
+				maxNumWidth = getMaxNumWidth(yCats, multiplySymbol, scFontMedium, scFontSmall, fm, fontAscent, maxNumWidth, xNumberRight, rect, yNumberOffset, baseFont, majorTicks, minorTicks, step, i1, i2, digits, x1, x2, str1, str2);
 			}
 		}
+		writeMinMax(xCats, yCats, scFont, fm, yOfXAxisNumbers, maxNumWidth, xNumberRight);
+	}
+
+	private void writeMinMax(String[] xCats, String[] yCats, Font scFont, FontMetrics fm, int yOfXAxisNumbers, int maxNumWidth, int xNumberRight) {
 		// --- Write min&max of range if simple style without any axis format flags
 		ip.setFont(scFont);
 		ip.setJustification(LEFT);
@@ -2762,13 +2720,17 @@ public class Plot implements Cloneable {
 			if (logXAxis) xLabelToDraw += " (LOG)";
 		} else
 			y += sc(1);
+		setTextLabels(xCats, yCats, scFont, maxNumWidth, xNumberRight, xLabelToDraw, yLabelToDraw, y);
+	}
+
+	private void setTextLabels(String[] xCats, String[] yCats, Font scFont, int maxNumWidth, int xNumberRight, String xLabelToDraw, String yLabelToDraw, int y) {
 		// --- Write x and y axis text labels
 		if (xCats == null) {
 			ip.setFont(pp.xLabel.getFont() == null ? scFont : scFont(pp.xLabel.getFont()));
 			ImageProcessor xLabel = stringToPixels(xLabelToDraw);
 			if(xLabel != null){
 				int xpos = leftMargin+(frame.width-xLabel.getWidth())/2;
-				int ypos = y + scFont.getSize()/3;//topMargin + frame.height + bottomMargin-xLabel.getHeight();
+				int ypos = y + scFont.getSize()/3;
 				ip.insert(xLabel, xpos, ypos);
 			}
 		}
@@ -2783,6 +2745,108 @@ public class Plot implements Cloneable {
 				ip.insert(yLabel, xpos, ypos);
 			}
 		}
+	}
+
+	private int getMaxNumWidth(String[] yCats, String multiplySymbol, Font scFontMedium, Font scFontSmall, FontMetrics fm, int fontAscent, int maxNumWidth, int xNumberRight, Rectangle rect, int yNumberOffset, Font baseFont, boolean majorTicks, boolean minorTicks, double step, int i1, int i2, int digits, int x1, int x2, String str1, String str2) {
+		int w1 = ip.getStringWidth(str1);
+		int w2 = ip.getStringWidth(str2);
+		int wMax = Math.max(w1,w2);
+		if (hasFlag(Y_NUMBERS) && (wMax > xNumberRight - sc(4) - (pp.yLabel.label.length()>0 ? fm.getHeight() : 0))) {
+			baseFont = scFontMedium;   //small font if there is not enough space for the numbers
+			ip.setFont(baseFont);
+		}
+		for (int i = i1; i<= i2; i++) {
+			double v = step ==0 ? yMin : i* step;
+			int y = topMargin + frameHeight - (int)Math.round((v - yMin)*yScale);
+			int index = (int) v;
+			double remainder =  Math.abs(v - Math.round(v));
+
+			if (yCats != null){
+				getMultilineOffset(yCats, xNumberRight, rect, yNumberOffset, y, index, remainder);
+				continue;
+			}
+
+			maxNumWidth = getMaxNumWidthY1(multiplySymbol, scFontSmall, fontAscent, maxNumWidth, xNumberRight, yNumberOffset, baseFont, majorTicks, digits, x1, x2, v, y);
+		}
+		maxNumWidth = getMaxNumWidthDetail(multiplySymbol, scFontSmall, fm, fontAscent, maxNumWidth, xNumberRight, baseFont, majorTicks, minorTicks, step, i1, i2, x1, x2);
+		return maxNumWidth;
+	}
+
+	private int getMaxNumWidthY1(String multiplySymbol, Font scFontSmall, int fontAscent, int maxNumWidth, int xNumberRight, int yNumberOffset, Font baseFont, boolean majorTicks, int digits, int x1, int x2, double v, int y) {
+		if (hasFlag(Y_GRID)) {
+			ip.setColor(gridColor);
+			ip.drawLine(x1, y, x2, y);
+			ip.setColor(Color.black);
+		}
+		if (majorTicks) {
+			ip.drawLine(x1, y, x1 +sc(tickLength), y);
+			ip.drawLine(x2, y, x2 -sc(tickLength), y);
+		}
+		if (hasFlag(Y_NUMBERS)) {
+			int w = 0;
+			if (logYAxis || digits <0) {
+				w = drawExpString(logYAxis ? Math.pow(10, v) : v, logYAxis ? -1 : -digits,
+						xNumberRight, y, RIGHT, fontAscent, baseFont, scFontSmall, multiplySymbol);
+			} else {
+				String s = IJ.d2s(v, digits);
+				w = ip.getStringWidth(s);
+				ip.drawString(s, xNumberRight, y + yNumberOffset);
+			}
+			if (w > maxNumWidth) maxNumWidth = w;
+		}
+		return maxNumWidth;
+	}
+
+	private void getMultilineOffset(String[] yCats, int xNumberRight, Rectangle rect, int yNumberOffset, int y, int index, double remainder) {
+		if(index >= 0 && index < yCats.length  && remainder < 1e-9){
+			String s = yCats[index];
+			int multiLineOffset = 0; // multi-line cat labels
+			for(int jj = 0; jj < s.length(); jj++)
+				if(s.charAt(jj) == '\n')
+					multiLineOffset -= rect.height/2;
+
+			ip.drawString(s, xNumberRight, y + yNumberOffset + multiLineOffset);
+		}
+	}
+
+	private int getMaxNumWidthDetail(String multiplySymbol, Font scFontSmall, FontMetrics fm, int fontAscent, int maxNumWidth, int xNumberRight, Font baseFont, boolean majorTicks, boolean minorTicks, double step, int i1, int i2, int x1, int x2) {
+		boolean haveMinorLogNumbers = i2 - i1 < 2;        //numbers on log minor ticks only if < 2 decades
+		if (minorTicks && (!logYAxis || step > 1.1)) {  //'standard' log minor ticks only for full decades
+			double mstep = niceNumber(step *0.19);       //non-log: 4 or 5 minor ticks per major tick
+			double minorPerMajor = step /mstep;
+			if (Math.abs(minorPerMajor-Math.round(minorPerMajor)) > 1e-10) //major steps are not an integer multiple of minor steps? (e.g. user step 90 deg)
+				mstep = step /4;
+			if (logYAxis && step < 1) mstep = 1;
+			i1 = (int)Math.ceil (Math.min(yMin,yMax)/mstep-1.e-10);
+			i2 = (int)Math.floor(Math.max(yMin,yMax)/mstep+1.e-10);
+			for (int i = i1; i<= i2; i++) {
+				double v = i*mstep;
+				int y = topMargin + frameHeight - (int)Math.round((v - yMin)*yScale);
+				ip.drawLine(x1, y, x1 +sc(minorTickLength), y);
+				ip.drawLine(x2, y, x2 -sc(minorTickLength), y);
+			}
+		}
+		if (logYAxis && majorTicks && Math.abs(yScale)>sc(MIN_X_GRIDSPACING)) {		 //minor ticks for log within the decade
+			int minorNumberLimit = haveMinorLogNumbers ? (int)(0.4*Math.abs(yScale)/ fm.getHeight()) : 0;	//more numbers on minor ticks when zoomed in
+			i1 = (int)Math.floor(Math.min(yMin,yMax)-1.e-10);
+			i2 = (int)Math.ceil(Math.max(yMin,yMax)+1.e-10);
+			for (int i = i1; i<= i2; i++) {
+				for (int m=2; m<10; m++) {
+					double v = i+Math.log10(m);
+					if (v > Math.min(yMin,yMax) && v < Math.max(yMin,yMax)) {
+						int y = topMargin + frameHeight - (int)Math.round((v - yMin)*yScale);
+						ip.drawLine(x1, y, x1 +sc(minorTickLength), y);
+						ip.drawLine(x2, y, x2 -sc(minorTickLength), y);
+						if (m<=minorNumberLimit) {
+							int w = drawExpString(Math.pow(10,v), 0, xNumberRight, y, RIGHT,
+									fontAscent, baseFont, scFontSmall, multiplySymbol);
+							if (w > maxNumWidth) maxNumWidth = w;
+						}
+					}
+				}
+			}
+		}
+		return maxNumWidth;
 	}
 
 	/** Returns the array of categories from an axis label in the form {cat1,cat2,cat3}, or null if not this form
@@ -3239,6 +3303,9 @@ public class Plot implements Cloneable {
 		String[] xCats = labelsInBraces('x'); // do we have categories at the x axis instead of numbers?
 		boolean separatedBars = plotObject.shape == SEPARATED_BAR || xCats != null;
 		int halfBarWidthInPixels = n <= 1 ? Math.max(1, frameWidth/2-2) : 0;
+		//private boolean snapToMinorGrid;  			// snap to grid when zooming to selection
+		// for plots with separate bars (e.g. categories), fraction of space, 0.1-1.0
+		double SEPARATED_BAR_WIDTH = 0.5;
 		if (separatedBars && n > 1)
 			halfBarWidthInPixels = Math.max(1, (int)Math.round(Math.abs
 				(0.5*(plotObject.xValues[n-1] - plotObject.xValues[0])/(n-1) * xScale * SEPARATED_BAR_WIDTH)));

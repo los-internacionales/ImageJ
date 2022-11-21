@@ -5,12 +5,10 @@ import ij.process.*;
 import ij.measure.*;
 import ij.io.*;
 import ij.util.Tools;
-import ij.plugin.frame.Editor;
 import ij.plugin.filter.Analyzer;
 import ij.text.TextWindow;
 import ij.macro.Interpreter;
 import java.awt.*;
-import java.util.*;
 import java.lang.reflect.*;
 import java.awt.geom.Rectangle2D;
 
@@ -123,48 +121,21 @@ public class ImageInfo implements PlugIn {
 	}
 
 	private String getInfo(ImagePlus imp, ImageProcessor ip) {
-		String s = new String("");
-		if (IJ.getInstance()!=null)
-			s += IJ.getInstance().getInfo()+"\n \n";
+		String s = "";
+		if (IJ.getInstance()!=null) s += IJ.getInstance().getInfo()+"\n \n";
 		s += "Title: " + imp.getTitle() + "\n";
 		Calibration cal = imp.getCalibration();
     	int stackSize = imp.getStackSize();
     	int channels = imp.getNChannels();
     	int slices = imp.getNSlices();
     	int frames = imp.getNFrames();
-		int digits = imp.getBitDepth()==32?4:0;
-		int dp, dp2;
 		boolean nonUniformUnits = !cal.getXUnit().equals(cal.getYUnit());
 		String xunit = cal.getXUnit();
 		String yunit = cal.getYUnit();
 		String zunit = cal.getZUnit();
 		if (cal.scaled()) {
-			String xunits = cal.getUnits();
-			String yunits = xunits;
-			String zunits = xunits;
-			if (nonUniformUnits) {
-				xunits = xunit;
-				yunits = yunit;
-				zunits = zunit;
-			}
-			double pw = imp.getWidth()*cal.pixelWidth;
-			double ph = imp.getHeight()*cal.pixelHeight;
-	    	s += "Width:  "+d2s(pw)+" " + xunits+" ("+imp.getWidth()+")\n";
-	    	s += "Height:  "+d2s(ph)+" " + yunits+" ("+imp.getHeight()+")\n";
-	    	if (slices>1) {
-				double pd = slices*cal.pixelDepth;
-	    		s += "Depth:  "+d2s(pd)+" " + zunits+" ("+slices+")\n";
-	    	}
-			s += "Size:  "+ImageWindow.getImageSize(imp)+"\n";
-	    	double xResolution = 1.0/cal.pixelWidth;
-	    	double yResolution = 1.0/cal.pixelHeight;
-	    	if (xResolution==yResolution)
-	    		s += "Resolution:  "+d2s(xResolution) + " pixels per "+xunit+"\n";
-	    	else {
-	    		s += "X Resolution:  "+d2s(xResolution) + " pixels per "+xunit+"\n";
-	    		s += "Y Resolution:  "+d2s(yResolution) + " pixels per "+yunit+"\n";
-	    	}
-	    } else {
+			s = addScaledData(imp, s, cal, slices, nonUniformUnits, xunit, yunit, zunit);
+		} else {
 	    	s += "Width:  " + imp.getWidth() + " pixels\n";
 	    	s += "Height:  " + imp.getHeight() + " pixels\n";
 	    	if (stackSize>1)
@@ -180,181 +151,271 @@ public class ImageInfo implements PlugIn {
     		String punit = cal.getUnit()+"^2";
     		if (nonUniformUnits)
     			punit = "("+xunit+" x "+yunit+")";
-	    	dp = Tools.getDecimalPlaces(cal.pixelWidth, cal.pixelHeight);
 	    	s += "Pixel size: "+d2s(cal.pixelWidth)+"x"+d2s(cal.pixelHeight)+" "+punit+"\n";
 	    }
 
-	    s += "ID: "+imp.getID()+"\n";
-	    int type = imp.getType();
-    	switch (type) {
-	    	case ImagePlus.GRAY8:
-	    		s += "Bits per pixel: 8 ";
-	    		String lut = "LUT";
-	    		if (imp.getProcessor().isColorLut())
-	    			lut = "color " + lut;
-	    		else
-	    			lut = "grayscale " + lut;
-	    		if (imp.isInvertedLut())
-	    			lut = "inverting " + lut;
-				s += "(" + lut + ")\n";
-				if (imp.getNChannels()>1)
-					s += displayRanges(imp);
-				else
-					s += "Display range: "+(int)ip.getMin()+"-"+(int)ip.getMax()+"\n";
-				break;
-	    	case ImagePlus.GRAY16: case ImagePlus.GRAY32:
-	    		if (type==ImagePlus.GRAY16) {
-	    			String sign = cal.isSigned16Bit()?"signed":"unsigned";
-	    			s += "Bits per pixel: 16 ("+sign+")\n";
-	    		} else
-	    			s += "Bits per pixel: 32 (float)\n";
-				if (imp.getNChannels()>1)
-					s += displayRanges(imp);
-				else {
-					s += "Display range: ";
-					double min = ip.getMin();
-					double max = ip.getMax();
-					if (cal.calibrated()) {
-						min = cal.getCValue((int)min);
-						max = cal.getCValue((int)max);
-					}
-					s += d2s(min) + " - " + d2s(max) + "\n";
-				}
-				break;
-	    	case ImagePlus.COLOR_256:
-	    		s += "Bits per pixel: 8 (color LUT)\n";
-	    		break;
-	    	case ImagePlus.COLOR_RGB:
-	    		s += "Bits per pixel: 32 (RGB)\n";
-	    		break;
-    	}
-    	String lutName = imp.getProp(LUT.nameKey);
-    	if (lutName!=null)
-			s += "LUT name: "+lutName+"\n";    		
+		s = addDataBytype(imp, ip, s, cal);
+		String lutName = imp.getProp(LUT.nameKey);
+    	if (lutName!=null) s += "LUT name: "+lutName+"\n";
 		double interval = cal.frameInterval;
 		double fps = cal.fps;
-    	if (stackSize>1) {
-    		ImageStack stack = imp.getStack();
-    		int slice = imp.getCurrentSlice();
-    		String number = slice + "/" + stackSize;
-    		String label = stack.getSliceLabel(slice);
-    		if (label!=null && label.contains("\n"))
-    			label = stack.getShortSliceLabel(slice);
-    		if (label!=null && label.length()>0)
-    			label = " (" + label + ")";
-    		else
-    			label = "";
-			if (imp.getNFrames()>1 || interval>0.0 || fps!=0.0) {
-				s += "Frame: " + number + label + "\n";
-				if (fps!=0.0) {
-					String sRate = Math.abs(fps-Math.round(fps))<0.00001?IJ.d2s(fps,0):IJ.d2s(fps,5);
-					s += "Frame rate: " + sRate + " fps\n";
-				} else
-					s += "Frame interval: " + ((int)interval==interval?IJ.d2s(interval,0):IJ.d2s(interval,5)) + " " + cal.getTimeUnit() + "\n";
-			} else
-				s += "Image: " + number + label + "\n";
-			if (imp.isHyperStack()) {
-				if (channels>1)
-					s += "  Channel: " + imp.getChannel() + "/" + channels + "\n";
-				if (slices>1)
-					s += "  Slice: " + imp.getSlice() + "/" + slices + "\n";
-				if (frames>1)
-					s += "  Frame: " + imp.getFrame() + "/" + frames + "\n";
-			}
-			if (imp.isComposite()) {
-				if (!imp.isHyperStack() && channels>1)
-					s += "  Channels: " + channels + "\n";
-				String mode = ((CompositeImage)imp).getModeAsString();
-				s += "  Composite mode: \"" + mode + "\"\n";
-			}
-			if (stack.isVirtual()) {
-				String stackType = "virtual";
-				if (stack instanceof AVI_Reader)
-					stackType += " (AVI Reader)";
-				if (stack instanceof FileInfoVirtualStack)
-					stackType += " (FileInfoVirtualStack)";
-				if (stack instanceof ListVirtualStack)
-					stackType += " (ListVirtualStack)";
-				s += "Stack type: " + stackType+ "\n";
-			}
-		} else if (imp.hasImageStack()) { // one image stack
-    		String label = imp.getStack().getShortSliceLabel(1);
-    		if (label!=null && label.length()>0)
-				s += "Image: 1/1 (" + label + ")\n";
-		}
+		s = addStackData(imp, s, cal, stackSize, channels, slices, frames, interval, fps);
 
-		if (imp.isLocked())
-			s += "**Locked**\n";
-		if (ip.getMinThreshold()==ImageProcessor.NO_THRESHOLD)
-			s += "No threshold\n";
-	    else {
-	    	double lower = ip.getMinThreshold();
-	    	double upper = ip.getMaxThreshold();
-	    	String uncalibrated = "";
+		s = addLockingMetadata(imp, ip, s, cal);
+
+		s = addCanvas(imp, s);
+
+		s = addCalibration(s, cal);
+
+		s = addMetadata(imp, s, cal, stackSize);
+
+		s = addOverlay(imp, s);
+
+		s = addRoi(imp, s, cal);
+
+		return s;
+	}
+
+	private String addScaledData(ImagePlus imp, String s, Calibration cal, int slices, boolean nonUniformUnits, String xunit, String yunit, String zunit) {
+		String xunits = cal.getUnits();
+		String yunits = xunits;
+		String zunits = xunits;
+		if (nonUniformUnits) {
+			xunits = xunit;
+			yunits = yunit;
+			zunits = zunit;
+		}
+		double pw = imp.getWidth()* cal.pixelWidth;
+		double ph = imp.getHeight()* cal.pixelHeight;
+		s += "Width:  "+d2s(pw)+" " + xunits+" ("+ imp.getWidth()+")\n";
+		s += "Height:  "+d2s(ph)+" " + yunits+" ("+ imp.getHeight()+")\n";
+		if (slices >1) {
+			double pd = slices * cal.pixelDepth;
+			s += "Depth:  "+d2s(pd)+" " + zunits+" ("+ slices +")\n";
+		}
+		s += "Size:  "+ImageWindow.getImageSize(imp)+"\n";
+		double xResolution = 1.0/ cal.pixelWidth;
+		double yResolution = 1.0/ cal.pixelHeight;
+		if (xResolution==yResolution)
+			s += "Resolution:  "+d2s(xResolution) + " pixels per "+ xunit +"\n";
+		else {
+			s += "X Resolution:  "+d2s(xResolution) + " pixels per "+ xunit +"\n";
+			s += "Y Resolution:  "+d2s(yResolution) + " pixels per "+ yunit +"\n";
+		}
+		return s;
+	}
+
+	private String addDataBytype(ImagePlus imp, ImageProcessor ip, String s, Calibration cal) {
+		s += "ID: "+ imp.getID()+"\n";
+		int type = imp.getType();
+		switch (type) {
+			case ImagePlus.GRAY8:
+				s = getGray8Data(imp, ip, s);
+				break;
+			case ImagePlus.GRAY16: case ImagePlus.GRAY32:
+				s = getGrayPlusData(imp, ip, s, cal, type);
+				break;
+			case ImagePlus.COLOR_256:
+				s += "Bits per pixel: 8 (color LUT)\n";
+				break;
+			case ImagePlus.COLOR_RGB:
+				s += "Bits per pixel: 32 (RGB)\n";
+				break;
+		}
+		return s;
+	}
+
+	private String getGray8Data(ImagePlus imp, ImageProcessor ip, String s) {
+		s += "Bits per pixel: 8 ";
+		String lut = "LUT";
+		if (imp.getProcessor().isColorLut())
+			lut = "color " + lut;
+		else
+			lut = "grayscale " + lut;
+		if (imp.isInvertedLut())
+			lut = "inverting " + lut;
+		s += "(" + lut + ")\n";
+		if (imp.getNChannels()>1)
+			s += displayRanges(imp);
+		else
+			s += "Display range: "+(int) ip.getMin()+"-"+(int) ip.getMax()+"\n";
+		return s;
+	}
+
+	private String getGrayPlusData(ImagePlus imp, ImageProcessor ip, String s, Calibration cal, int type) {
+		if (type ==ImagePlus.GRAY16) {
+			String sign = cal.isSigned16Bit()?"signed":"unsigned";
+			s += "Bits per pixel: 16 ("+sign+")\n";
+		} else
+			s += "Bits per pixel: 32 (float)\n";
+		if (imp.getNChannels()>1)
+			s += displayRanges(imp);
+		else {
+			s += "Display range: ";
+			double min = ip.getMin();
+			double max = ip.getMax();
 			if (cal.calibrated()) {
-				uncalibrated = " ("+(int)lower+"-"+(int)upper+")";
-				lower = cal.getCValue((int)lower);
-				upper = cal.getCValue((int)upper);
+				min = cal.getCValue((int)min);
+				max = cal.getCValue((int)max);
 			}
-			int lutMode = ip.getLutUpdateMode();
-			String mode = "red";
-			switch (lutMode) {
-				case ImageProcessor.BLACK_AND_WHITE_LUT: mode="B&W"; break;
-				case ImageProcessor.NO_LUT_UPDATE: mode="invisible"; break;
-				case ImageProcessor.OVER_UNDER_LUT: mode="over/under"; break;
-			}
-			s += "Threshold: "+d2s(lower)+"-"+d2s(upper)+uncalibrated+" ("+mode+")\n";
+			s += d2s(min) + " - " + d2s(max) + "\n";
 		}
-		ImageCanvas ic = imp.getCanvas();
-    	double mag = ic!=null?ic.getMagnification():1.0;
-    	if (mag!=1.0)
-			s += "Magnification: " + IJ.d2s(mag,2) + "\n";
-		if (ic!=null)
-			s += "ScaleToFit: " + ic.getScaleToFit() + "\n";
+		return s;
+	}
 
-
-	    String valueUnit = cal.getValueUnit();
-	    if (cal.calibrated()) {
-	    	s += " \n";
-	    	int curveFit = cal.getFunction();
-			s += "Calibration function: ";
-			if (curveFit==Calibration.UNCALIBRATED_OD)
-				s += "Uncalibrated OD\n";
-			else if (curveFit==Calibration.CUSTOM)
-				s += "Custom lookup table\n";
+	private static String addStackData(ImagePlus imp, String s, Calibration cal, int stackSize, int channels, int slices, int frames, double interval, double fps) {
+		if (stackSize >1) {
+			ImageStack stack = imp.getStack();
+			int slice = imp.getCurrentSlice();
+			String number = slice + "/" + stackSize;
+			String label = stack.getSliceLabel(slice);
+			if (label!=null && label.contains("\n"))
+				label = stack.getShortSliceLabel(slice);
+			if (label!=null && label.length()>0)
+				label = " (" + label + ")";
 			else
-				s += CurveFitter.fList[curveFit]+"\n";
-			double[] c = cal.getCoefficients();
-			if (c!=null) {
-				s += "  a: "+IJ.d2s(c[0],6)+"\n";
-				s += "  b: "+IJ.d2s(c[1],6)+"\n";
-				if (c.length>=3)
-					s += "  c: "+IJ.d2s(c[2],6)+"\n";
-				if (c.length>=4)
-					s += "  c: "+IJ.d2s(c[3],6)+"\n";
-				if (c.length>=5)
-					s += "  c: "+IJ.d2s(c[4],6)+"\n";
-			}
+				label = "";
+			s = getFPSData(imp, s, cal, interval, fps, number, label);
+			s = getHyperStackData(imp, s, channels, slices, frames);
+			s = getCompositeData(imp, s, channels);
+			s = getVirtualData(s, stack);
+		} else if (imp.hasImageStack()) { // one image stack
+			String label = imp.getStack().getShortSliceLabel(1);
+			if (label!=null && label.length()>0) s += "Image: 1/1 (" + label + ")\n";
+		}
+		return s;
+	}
+
+	private static String getVirtualData(String s, ImageStack stack) {
+		if (stack.isVirtual()) {
+			String stackType = "virtual";
+			if (stack instanceof AVI_Reader)
+				stackType += " (AVI Reader)";
+			if (stack instanceof FileInfoVirtualStack)
+				stackType += " (FileInfoVirtualStack)";
+			if (stack instanceof ListVirtualStack)
+				stackType += " (ListVirtualStack)";
+			s += "Stack type: " + stackType+ "\n";
+		}
+		return s;
+	}
+
+	private static String getCompositeData(ImagePlus imp, String s, int channels) {
+		if (imp.isComposite()) {
+			if (!imp.isHyperStack() && channels >1)
+				s += "  Channels: " + channels + "\n";
+			String mode = ((CompositeImage) imp).getModeAsString();
+			s += "  Composite mode: \"" + mode + "\"\n";
+		}
+		return s;
+	}
+
+	private static String getHyperStackData(ImagePlus imp, String s, int channels, int slices, int frames) {
+		if (imp.isHyperStack()) {
+			if (channels >1)
+				s += "  Channel: " + imp.getChannel() + "/" + channels + "\n";
+			if (slices >1)
+				s += "  Slice: " + imp.getSlice() + "/" + slices + "\n";
+			if (frames >1)
+				s += "  Frame: " + imp.getFrame() + "/" + frames + "\n";
+		}
+		return s;
+	}
+
+	private static String getFPSData(ImagePlus imp, String s, Calibration cal, double interval, double fps, String number, String label) {
+		if (imp.getNFrames()>1 || interval >0.0 || fps !=0.0) {
+			s += "Frame: " + number + label + "\n";
+			if (fps !=0.0) {
+				String sRate = Math.abs(fps -Math.round(fps))<0.00001?IJ.d2s(fps,0):IJ.d2s(fps,5);
+				s += "Frame rate: " + sRate + " fps\n";
+			} else
+				s += "Frame interval: " + ((int) interval == interval ?IJ.d2s(interval,0):IJ.d2s(interval,5)) + " " + cal.getTimeUnit() + "\n";
+		} else
+			s += "Image: " + number + label + "\n";
+		return s;
+	}
+
+	private String addLockingMetadata(ImagePlus imp, ImageProcessor ip, String s, Calibration cal) {
+		if (imp.isLocked()) {
+			s += "**Locked**\n";
+		}
+		if (ip.getMinThreshold()==ImageProcessor.NO_THRESHOLD) {
+			s += "No threshold\n";
+		}
+	    else {
+			s = addUncalibratedData(ip, s, cal);
+		}
+		return s;
+	}
+
+	private String addUncalibratedData(ImageProcessor ip, String s, Calibration cal) {
+		double lower = ip.getMinThreshold();
+		double upper = ip.getMaxThreshold();
+		String uncalibrated = "";
+		if (cal.calibrated()) {
+			uncalibrated = " ("+(int)lower+"-"+(int)upper+")";
+			lower = cal.getCValue((int)lower);
+			upper = cal.getCValue((int)upper);
+		}
+		int lutMode = ip.getLutUpdateMode();
+		String mode = "red";
+		switch (lutMode) {
+			case ImageProcessor.BLACK_AND_WHITE_LUT: mode="B&W"; break;
+			case ImageProcessor.NO_LUT_UPDATE: mode="invisible"; break;
+			case ImageProcessor.OVER_UNDER_LUT: mode="over/under"; break;
+		}
+		s += "Threshold: "+d2s(lower)+"-"+d2s(upper)+uncalibrated+" ("+mode+")\n";
+		return s;
+	}
+
+	private static String addCanvas(ImagePlus imp, String s) {
+		ImageCanvas ic = imp.getCanvas();
+		double mag = ic!=null?ic.getMagnification():1.0;
+		if (mag!=1.0) s += "Magnification: " + IJ.d2s(mag,2) + "\n";
+		if (ic!=null) s += "ScaleToFit: " + ic.getScaleToFit() + "\n";
+		return s;
+	}
+
+	private static String addCalibration(String s, Calibration cal) {
+		String valueUnit = cal.getValueUnit();
+		if (cal.calibrated()) {
+			s += " \n";
+			int curveFit = cal.getFunction();
+			s += "Calibration function: ";
+			s = addCurveFit(s, cal, curveFit);
+
 			s += "  Unit: \""+valueUnit+"\"\n";
-	    } else if (valueUnit!=null && !valueUnit.equals("Gray Value")) {
+		} else if (valueUnit!=null && !valueUnit.equals("Gray Value")) {
 			s += "Calibration function: None\n";
 			s += "  Unit: \""+valueUnit+"\"\n";
-	    } else
-	    	s += "Uncalibrated\n";
+		} else
+			s += "Uncalibrated\n";
+		return s;
+	}
 
-	    FileInfo fi = imp.getOriginalFileInfo();
-		if (fi!=null) {
-			if (fi.url!=null && !fi.url.equals(""))
-				s += "URL: " + fi.url + "\n";
-			else {
-				String defaultDir = (fi.directory==null || fi.directory.length()==0)?System.getProperty("user.dir"):"";
-				if (defaultDir.length()>0) {
-					defaultDir = defaultDir.replaceAll("\\\\", "/");
-					defaultDir += "/";
-				}
-				s += "Path: " + defaultDir + fi.getFilePath() + "\n";
-			}
+	private static String addCurveFit(String s, Calibration cal, int curveFit) {
+		if (curveFit ==Calibration.UNCALIBRATED_OD)
+			s += "Uncalibrated OD\n";
+		else if (curveFit ==Calibration.CUSTOM)
+			s += "Custom lookup table\n";
+		else
+			s += CurveFitter.fList[curveFit]+"\n";
+		double[] c = cal.getCoefficients();
+		if (c!=null) {
+			s += "  a: "+IJ.d2s(c[0],6)+"\n";
+			s += "  b: "+IJ.d2s(c[1],6)+"\n";
+			if (c.length>=3)
+				s += "  c: "+IJ.d2s(c[2],6)+"\n";
+			if (c.length>=4)
+				s += "  c: "+IJ.d2s(c[3],6)+"\n";
+			if (c.length>=5)
+				s += "  c: "+IJ.d2s(c[4],6)+"\n";
 		}
+		return s;
+	}
+
+	private String addMetadata(ImagePlus imp, String s, Calibration cal, int stackSize) {
+		s = addFileInfo(imp, s);
 
 		ImageWindow win = imp.getWindow();
 		if (win!=null) {
@@ -367,20 +428,45 @@ public class ImageInfo implements PlugIn {
 			s += "SetMenuBarCount: "+Menus.setMenuBarCount+time+"\n";
 		}
 
-		String zOrigin = stackSize>1||cal.zOrigin!=0.0?","+d2s(cal.zOrigin):"";
+		String zOrigin = stackSize >1|| cal.zOrigin!=0.0?","+d2s(cal.zOrigin):"";
 		String origin = d2s(cal.xOrigin)+","+d2s(cal.yOrigin)+zOrigin;
-		if (!origin.equals("0,0") || cal.getInvertY())
-	    	s += "Coordinate origin:  "+origin+"\n";
-	    if (cal.getInvertY())
-	    	s += "Inverted y coordinates\n";
+		if (!origin.equals("0,0") || cal.getInvertY()) {
+			s += "Coordinate origin:  " + origin + "\n";
+		}
+		if (cal.getInvertY()) s += "Inverted y coordinates\n";
 
-	    String pinfo = imp.getPropsInfo();
-	    if (!pinfo.equals("0"))
-	   		s += "Properties: " + pinfo + "\n";
-	   	else
-	   		s += "No properties\n";
-	   	
-	    Overlay overlay = imp.getOverlay();
+		s = addPInfo(imp, s);
+		return s;
+	}
+
+	private static String addFileInfo(ImagePlus imp, String s) {
+		FileInfo fi = imp.getOriginalFileInfo();
+		if (fi!=null) {
+			if (fi.url!=null && !fi.url.equals(""))
+				s += "URL: " + fi.url + "\n";
+			else {
+				String defaultDir = (fi.directory==null || fi.directory.length()==0)?System.getProperty("user.dir"):"";
+				if (defaultDir.length()>0) {
+					defaultDir = defaultDir.replaceAll("\\\\", "/");
+					defaultDir += "/";
+				}
+				s += "Path: " + defaultDir + fi.getFilePath() + "\n";
+			}
+		}
+		return s;
+	}
+
+	private static String addPInfo(ImagePlus imp, String s) {
+		String pinfo = imp.getPropsInfo();
+		if (!pinfo.equals("0"))
+			   s += "Properties: " + pinfo + "\n";
+		   else
+			   s += "No properties\n";
+		return s;
+	}
+
+	private static String addOverlay(ImagePlus imp, String s) {
+		Overlay overlay = imp.getOverlay();
 		if (overlay!=null) {
 			int n = overlay.size();
 			String elements = n==1?" element":" elements";
@@ -393,77 +479,104 @@ public class ImageInfo implements PlugIn {
 		Interpreter interp = Interpreter.getInstance();
 		if (interp!=null)
 			s += "Macro is running"+(Interpreter.isBatchMode()?" in batch mode":"")+"\n";
+		return s;
+	}
 
-	    Roi roi = imp.getRoi();
-	    if (roi == null) {
+	private String addRoi(ImagePlus imp, String s, Calibration cal) {
+		Roi roi = imp.getRoi();
+		if (roi == null) {
 			if (cal.calibrated())
-	    		s += " \n";
-	    	s += "No selection\n";
-	    } else if (roi instanceof RotatedRectRoi) {
-	    	s += "\nRotated rectangle selection\n";
-	    	double[] p = ((RotatedRectRoi)roi).getParams();
-			double dx = p[2] - p[0];
-			double dy = p[3] - p[1];
-			double major = Math.sqrt(dx*dx+dy*dy);
-			s += "  Length: " + IJ.d2s(major,2) + "\n";
-			s += "  Width: " + IJ.d2s(p[4],2) + "\n";
-			s += "  X1: " + IJ.d2s(p[0],2) + "\n";
-			s += "  Y1: " + IJ.d2s(p[1],2) + "\n";
-			s += "  X2: " + IJ.d2s(p[2],2) + "\n";
-			s += "  Y2: " + IJ.d2s(p[3],2) + "\n";
-	    } else if (roi instanceof EllipseRoi) {
-	    	s += "\nElliptical selection\n";
-	    	double[] p = ((EllipseRoi)roi).getParams();
-			double dx = p[2] - p[0];
-			double dy = p[3] - p[1];
-			double major = Math.sqrt(dx*dx+dy*dy);
-			s += "  Major: " + IJ.d2s(major,2) + "\n";
-			s += "  Minor: " + IJ.d2s(major*p[4],2) + "\n";
-			s += "  X1: " + IJ.d2s(p[0],2) + "\n";
-			s += "  Y1: " + IJ.d2s(p[1],2) + "\n";
-			s += "  X2: " + IJ.d2s(p[2],2) + "\n";
-			s += "  Y2: " + IJ.d2s(p[3],2) + "\n";
-			s += "  Aspect ratio: " + IJ.d2s(p[4],2) + "\n";
-	    } else {
-	    	s += " \n";
-	    	s += roi.getTypeAsString()+" Selection";
-	    	String points = null;
-			if (roi instanceof PointRoi) {
-				int npoints = ((PolygonRoi)roi).getNCoordinates();
-				String suffix = npoints>1?"s)":")";
-				points = " (" + npoints + " point" + suffix;
-			}
-    		String name = roi.getName();
-    		if (name!=null) {
-				s += " (\"" + name + "\")";
-				if (points!=null) s += "\n " + points;
-			} else if (points!=null)
-				s += points;
-			s += "\n";
-	    	if (roi instanceof Line) {
-	    		Line line = (Line)roi;
-	    		s += "  X1: " + IJ.d2s(cal.getX(line.x1d)) + "\n";
-	    		s += "  Y1: " + IJ.d2s(cal.getY(line.y1d, imp.getHeight())) + "\n";
-	    		s += "  X2: " + IJ.d2s(cal.getX(line.x2d)) + "\n";
-	    		s += "  Y2: " + IJ.d2s(cal.getY(line.y2d, imp.getHeight())) + "\n";
-			} else {
-				Rectangle2D.Double r = roi.getFloatBounds();
-				int decimals = r.x==(int)r.x && r.y==(int)r.y && r.width==(int)r.width && r.height==(int)r.height ?
-						0 : 2;
-				if (cal.scaled()) {
-					s += "  X: " + IJ.d2s(cal.getX(r.x)) + " (" + IJ.d2s(r.x, decimals) + ")\n";
-					s += "  Y: " + IJ.d2s(cal.getY(r.y,imp.getHeight())) + " (" +  IJ.d2s(yy(r.y, imp), decimals) + ")\n";
-					s += "  Width: " + IJ.d2s(r.width*cal.pixelWidth) + " (" +  IJ.d2s(r.width, decimals) + ")\n";
-					s += "  Height: " + IJ.d2s(r.height*cal.pixelHeight) + " (" +  IJ.d2s(r.height, decimals) + ")\n";
-				} else {
-					s += "  X: " + IJ.d2s(r.x, decimals) + "\n";
-					s += "  Y: " + IJ.d2s(yy(r.y, imp), decimals) + "\n";
-					s += "  Width: " + IJ.d2s(r.width, decimals) + "\n";
-					s += "  Height: " + IJ.d2s(r.height, decimals) + "\n";
-				}
-			}
-	    }
+				s += " \n";
+			s += "No selection\n";
+		} else if (roi instanceof RotatedRectRoi) {
+			s = addRectangle(s, (RotatedRectRoi) roi);
+		} else if (roi instanceof EllipseRoi) {
+			s = addEllipse(s, (EllipseRoi) roi);
+		} else {
+			s = addPolygon(imp, s, cal, roi);
+		}
+		return s;
+	}
 
+	private static String addRectangle(String s, RotatedRectRoi roi) {
+		s += "\nRotated rectangle selection\n";
+		double[] p = roi.getParams();
+		double dx = p[2] - p[0];
+		double dy = p[3] - p[1];
+		double major = Math.sqrt(dx*dx+dy*dy);
+		s += "  Length: " + IJ.d2s(major,2) + "\n";
+		s += "  Width: " + IJ.d2s(p[4],2) + "\n";
+		s += "  X1: " + IJ.d2s(p[0],2) + "\n";
+		s += "  Y1: " + IJ.d2s(p[1],2) + "\n";
+		s += "  X2: " + IJ.d2s(p[2],2) + "\n";
+		s += "  Y2: " + IJ.d2s(p[3],2) + "\n";
+		return s;
+	}
+
+	private static String addEllipse(String s, EllipseRoi roi) {
+		s += "\nElliptical selection\n";
+		double[] p = roi.getParams();
+		double dx = p[2] - p[0];
+		double dy = p[3] - p[1];
+		double major = Math.sqrt(dx*dx+dy*dy);
+		s += "  Major: " + IJ.d2s(major,2) + "\n";
+		s += "  Minor: " + IJ.d2s(major*p[4],2) + "\n";
+		s += "  X1: " + IJ.d2s(p[0],2) + "\n";
+		s += "  Y1: " + IJ.d2s(p[1],2) + "\n";
+		s += "  X2: " + IJ.d2s(p[2],2) + "\n";
+		s += "  Y2: " + IJ.d2s(p[3],2) + "\n";
+		s += "  Aspect ratio: " + IJ.d2s(p[4],2) + "\n";
+		return s;
+	}
+
+	private String addPolygon(ImagePlus imp, String s, Calibration cal, Roi roi) {
+		s += " \n";
+		s += roi.getTypeAsString()+" Selection";
+		String points = null;
+		if (roi instanceof PointRoi) {
+			int npoints = ((PolygonRoi) roi).getNCoordinates();
+			String suffix = npoints>1?"s)":")";
+			points = " (" + npoints + " point" + suffix;
+		}
+		String name = roi.getName();
+		if (name!=null) {
+			s += " (\"" + name + "\")";
+			if (points!=null) s += "\n " + points;
+		} else if (points!=null)
+			s += points;
+		s += "\n";
+		s = addLine(imp, s, cal, roi);
+		return s;
+	}
+
+	private String addLine(ImagePlus imp, String s, Calibration cal, Roi roi) {
+		if (roi instanceof Line) {
+			Line line = (Line) roi;
+			s += "  X1: " + IJ.d2s(cal.getX(line.x1d)) + "\n";
+			s += "  Y1: " + IJ.d2s(cal.getY(line.y1d, imp.getHeight())) + "\n";
+			s += "  X2: " + IJ.d2s(cal.getX(line.x2d)) + "\n";
+			s += "  Y2: " + IJ.d2s(cal.getY(line.y2d, imp.getHeight())) + "\n";
+		} else {
+			s = addBounds(imp, s, cal, roi);
+		}
+		return s;
+	}
+
+	private String addBounds(ImagePlus imp, String s, Calibration cal, Roi roi) {
+		Rectangle2D.Double r = roi.getFloatBounds();
+		int decimals = r.x==(int)r.x && r.y==(int)r.y && r.width==(int)r.width && r.height==(int)r.height ?
+				0 : 2;
+		if (cal.scaled()) {
+			s += "  X: " + IJ.d2s(cal.getX(r.x)) + " (" + IJ.d2s(r.x, decimals) + ")\n";
+			s += "  Y: " + IJ.d2s(cal.getY(r.y, imp.getHeight())) + " (" +  IJ.d2s(yy(r.y, imp), decimals) + ")\n";
+			s += "  Width: " + IJ.d2s(r.width* cal.pixelWidth) + " (" +  IJ.d2s(r.width, decimals) + ")\n";
+			s += "  Height: " + IJ.d2s(r.height* cal.pixelHeight) + " (" +  IJ.d2s(r.height, decimals) + ")\n";
+		} else {
+			s += "  X: " + IJ.d2s(r.x, decimals) + "\n";
+			s += "  Y: " + IJ.d2s(yy(r.y, imp), decimals) + "\n";
+			s += "  Width: " + IJ.d2s(r.width, decimals) + "\n";
+			s += "  Height: " + IJ.d2s(r.height, decimals) + "\n";
+		}
 		return s;
 	}
 
