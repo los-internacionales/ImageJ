@@ -235,29 +235,12 @@ public class FolderOpener implements PlugIn, TextListener {
 				} else {
 					for (int slice=1; slice<=stackSize; slice++) {
 						int bitDepth2 = imp.getBitDepth();
-						String label2 = label;
 						ImageProcessor ip = null;
-						if (stackSize>1) {
-							String sliceLabel = inputStack.getSliceLabel(slice);
-							if (sliceLabel!=null && sliceLabel.length()<=15)
-								label2 += ":"+sliceLabel;
-							else if (label2!=null && !label2.equals(""))
-								label2 += ":"+slice;
-						}
+						String label2 = getLabel2(stackSize, inputStack, slice, label);
 						ip = inputStack.getProcessor(slice);
 						if (bitDepth2!=bitDepth && dicomImages && bitDepth==16 && bitDepth2==32 && this.scale==100) {
 							ip = ip.convertToFloat();
-							bitDepth = 32;
-							ImageStack stack2 = new ImageStack(width, height, stack.getColorModel());
-							for (int n=1; n<=stack.size(); n++) {
-								ImageProcessor ip2 = stack.getProcessor(n);
-								ip2 = ip2.convertToFloat();
-								ip2.subtract(32768);
-								String sliceLabel = stack.getSliceLabel(n);
-								stack2.addSlice(sliceLabel, ip2.convertToFloat());
-							}
-							stack = stack2;
-
+							stack = refineStack(width, height, stack);
 						}
 						if (this.scale<100.0)
 							ip = ip.resize((int)(width*this.scale/100.0), (int)(height*this.scale/100.0));
@@ -279,7 +262,46 @@ public class FolderOpener implements PlugIn, TextListener {
 			IJ.outOfMemory("FolderOpener");
 			if (stack!=null) stack.trim();
 		}
-		if (stack!=null && stack.size()>0) {
+		if (processVirtualStack(arg, list, title, stack, min, max, cal, allSameCalibration, overlay)) return;
+		IJ.showProgress(1.0);
+		processRecord();
+	}
+
+	private void processRecord() {
+		if (Recorder.record) {
+			String options = openAsVirtualStack&&!openAsSeparateImages?"virtual":"";
+			if (bitDepth!=defaultBitDepth)
+				options = options + " bitdepth=" + bitDepth;
+			if (filter!=null && filter.length()>0) {
+				if (filter.contains(" "))
+					filter = "["+filter+"]";
+				options = options + " filter=" + filter;
+			}
+			if (start!=1)
+				options = options + " start=" + start;
+			if (step!=1)
+				options = options + " step=" + step;
+			if (scale!=100)
+				options = options + " scale=" + scale;
+			if (!sortByMetaData)
+				options = options + " noMetaSort";
+			if (!Recorder.scriptMode() && openAsSeparateImages)
+				options = options + " open";
+			String dir = Recorder.fixPath(directory);
+			if (Recorder.scriptMode())
+   				Recorder.recordCall("imp = FolderOpener.open(\""+dir+"\", \""+options+"\");");
+   			else {
+   				if (options.length()==0)
+   					Recorder.recordString("File.openSequence(\""+dir+"\");\n");
+   				else
+   					Recorder.recordString("File.openSequence(\""+dir+"\", \""+options+"\");\n");
+   				Recorder.disableCommandRecording();
+   			}
+		}
+	}
+
+	private boolean processVirtualStack(String arg, String[] list, String title, ImageStack stack, double min, double max, Calibration cal, boolean allSameCalibration, Overlay overlay) {
+		if (stack !=null && stack.size()>0) {
 			ImagePlus imp2 = new ImagePlus(title, stack);
 			if (imp2.getType()==ImagePlus.GRAY16 || imp2.getType()==ImagePlus.GRAY32)
 				imp2.getProcessor().setMinAndMax(min, max);
@@ -291,7 +313,7 @@ public class FolderOpener implements PlugIn, TextListener {
 			imp2.setFileInfo(fi); // saves FileInfo of the first image
 			imp2.setOverlay(overlay);
 			if (stack instanceof VirtualStack) {
-				Properties props = ((VirtualStack)stack).getProperties();
+				Properties props = ((VirtualStack) stack).getProperties();
 				if (props!=null)
 					imp2.setProperty("FHT", props.get("FHT"));
 			}
@@ -311,7 +333,7 @@ public class FolderOpener implements PlugIn, TextListener {
 				imp2.setStack(stack);
 				double voxelDepth = DicomTools.getVoxelDepth(stack);
 				if (voxelDepth>0.0) {
-					if (IJ.debugMode) IJ.log("DICOM voxel depth set to "+voxelDepth+" ("+cal.pixelDepth+")");
+					if (IJ.debugMode) IJ.log("DICOM voxel depth set to "+voxelDepth+" ("+ cal.pixelDepth+")");
 					cal.pixelDepth = voxelDepth;
 					imp2.setCalibration(cal);
 				}
@@ -322,64 +344,59 @@ public class FolderOpener implements PlugIn, TextListener {
 			}
 			if (imp2.getStackSize()==1) {
 				int idx = this.start-1;
-				if (idx<0 || idx>=list.length)
+				if (idx<0 || idx>= list.length)
 					idx = 0;
 				imp2.setProp("Slice_Label", list[idx]);
 				if (info1!=null)
 					imp2.setProperty("Info", info1);
 			}
-			if ((arg==null||runningOpen) && !saveImage) {
+			if ((arg ==null||runningOpen) && !saveImage) {
 				String time = (System.currentTimeMillis()-t0)/1000.0 + " seconds";
 				if (openAsSeparateImages) {
 					if (imp2.getStackSize()>MAX_SEPARATE && !IJ.isMacro()) {
 						boolean ok = IJ.showMessageWithCancel("Import>Image Sequence",
 						"Are you sure you want to open "+imp2.getStackSize()
 						+" separate windows?\nThis may cause the system to become very slow or stall.");
-						if (!ok) return;
+						if (!ok) return true;
 					}
 					openAsSeparateImages(imp2);
 				} else
 					imp2.show(time);
 				if (stack.isVirtual()) {
 					overlay = stack.getProcessor(1).getOverlay();
-					if (overlay!=null)
+					if (overlay !=null)
 						imp2.setOverlay(overlay);
 				}
 			}
 			if (saveImage)
 				image = imp2;
 		}
-		IJ.showProgress(1.0);
-		if (Recorder.record) {
-			String options = openAsVirtualStack&&!openAsSeparateImages?"virtual":"";
-			if (bitDepth!=defaultBitDepth)
-				options = options + " bitdepth=" + bitDepth;				
-			if (filter!=null && filter.length()>0) {
-				if (filter.contains(" "))
-					filter = "["+filter+"]";
-				options = options + " filter=" + filter;
-			}
-			if (start!=1)
-				options = options + " start=" + start;				
-			if (step!=1)
-				options = options + " step=" + step;				
-			if (scale!=100)
-				options = options + " scale=" + scale;				
-			if (!sortByMetaData)
-				options = options + " noMetaSort";
-			if (!Recorder.scriptMode() && openAsSeparateImages)
-				options = options + " open";
-			String dir = Recorder.fixPath(directory);
-			if (Recorder.scriptMode())
-   				Recorder.recordCall("imp = FolderOpener.open(\""+dir+"\", \""+options+"\");");
-   			else {
-   				if (options.length()==0)
-   					Recorder.recordString("File.openSequence(\""+dir+"\");\n");
-   				else
-   					Recorder.recordString("File.openSequence(\""+dir+"\", \""+options+"\");\n");
-   				Recorder.disableCommandRecording();
-   			}
+		return false;
+	}
+
+	private ImageStack refineStack(int width, int height, ImageStack stack) {
+		bitDepth = 32;
+		ImageStack stack2 = new ImageStack(width, height, stack.getColorModel());
+		for (int n = 1; n<= stack.size(); n++) {
+			ImageProcessor ip2 = stack.getProcessor(n);
+			ip2 = ip2.convertToFloat();
+			ip2.subtract(32768);
+			String sliceLabel = stack.getSliceLabel(n);
+			stack2.addSlice(sliceLabel, ip2.convertToFloat());
 		}
+		stack = stack2;
+		return stack;
+	}
+
+	private static String getLabel2(int stackSize, ImageStack inputStack, int slice, String label2) {
+		if (stackSize >1) {
+			String sliceLabel = inputStack.getSliceLabel(slice);
+			if (sliceLabel!=null && sliceLabel.length()<=15)
+				label2 += ":"+sliceLabel;
+			else if (label2 !=null && !label2.equals(""))
+				label2 += ":"+ slice;
+		}
+		return label2;
 	}
 
 	private Overlay refineOverlay(Overlay overlay, int count, Overlay overlay2) {
